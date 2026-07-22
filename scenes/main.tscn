@@ -1,12 +1,10 @@
 [gd_scene format=3 uid="uid://s16rqhf5quqv"]
 
-[ext_resource type="Script" uid="uid://c7ds2sb5ti5ql" path="res://scripts/game/game_controller.gd" id="1_controller"]
+[ext_resource type="Script" uid="uid://c7ds2sb5ti5ql" path="res://scripts/game/game_controller.gd" id="1_game"]
 [ext_resource type="Theme" uid="uid://cfmiuq41wdvg7" path="res://resources/themes/mineshift_theme.tres" id="2_theme"]
 [ext_resource type="Script" uid="uid://b40x15f1q0byd" path="res://scripts/ui/board_view.gd" id="3_board"]
-[ext_resource type="Script" uid="uid://5tt1qd7v0ndh" path="res://scripts/ui/score_feedback.gd" id="4_feedback"]
-[ext_resource type="Script" uid="uid://bqebpm5w3dwy0" path="res://scripts/ui/pattern_feedback.gd" id="5_pattern_feedback"]
 
-[node name="Main" type="Control" unique_id=756142053]
+[node name="Main" type="Control" unique_id=2109618197]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -14,9 +12,9 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 theme = ExtResource("2_theme")
-script = ExtResource("1_controller")
+script = ExtResource("1_game")
 
-[node name="Background" type="ColorRect" parent="." unique_id=1093038156]
+[node name="Background" type="ColorRect" parent="." unique_id=2010271672]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -24,10 +22,11 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(0.027, 0.039, 0.059, 1)
+color = Color(0.035, 0.055, 0.086, 1)
 
-[node name="GameScreen" type="Control" parent="." unique_id=1181460965]
+[node name="GameScreen" type="Control" parent="." unique_id=1265358273]
 unique_name_in_owner = true
+visible = false
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -35,349 +34,185 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="SafeArea" type="MarginContainer" parent="GameScreen" unique_id=1247355858]
+[node name="GameMargin" type="MarginContainer" parent="GameScreen" unique_id=750043104]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 28.0
-offset_top = 16.0
-offset_right = -28.0
-offset_bottom = -16.0
+offset_left = 18.0
+offset_top = 14.0
+offset_right = -18.0
+offset_bottom = -14.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="Layout" type="VBoxContainer" parent="GameScreen/SafeArea" unique_id=129351414]
-layout_mode = 2
-theme_override_constants/separation = 10
-
-[node name="HeaderPanel" type="PanelContainer" parent="GameScreen/SafeArea/Layout" unique_id=1506348679]
-layout_mode = 2
-
-[node name="HeaderLayout" type="VBoxContainer" parent="GameScreen/SafeArea/Layout/HeaderPanel" unique_id=1745536140]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="TopRow" type="HBoxContainer" parent="GameScreen/SafeArea/Layout/HeaderPanel/HeaderLayout" unique_id=681345949]
-layout_mode = 2
-theme_override_constants/separation = 14
-
-[node name="Brand" type="VBoxContainer" parent="GameScreen/SafeArea/Layout/HeaderPanel/HeaderLayout/TopRow" unique_id=813669406]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 0
-
-[node name="Title" type="Label" parent="GameScreen/SafeArea/Layout/HeaderPanel/HeaderLayout/TopRow/Brand" unique_id=1095112368]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.396, 0.867, 1, 1)
-theme_override_font_sizes/font_size = 24
-text = "MINESHIFT"
-
-[node name="Subtitle" type="Label" parent="GameScreen/SafeArea/Layout/HeaderPanel/HeaderLayout/TopRow/Brand" unique_id=1385445553]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.408, 0.478, 0.584, 1)
-theme_override_font_sizes/font_size = 10
-text = "RUN PROTOCOL // 05 FIELDS"
-
-[node name="FieldLabel" type="Label" parent="GameScreen/SafeArea/Layout/HeaderPanel/HeaderLayout/TopRow" unique_id=871816072]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(100, 0)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.882, 0.914, 0.953, 1)
-theme_override_font_sizes/font_size = 14
-text = "FIELD 1 / 5"
-
-[node name="StateLabel" type="Label" parent="GameScreen/SafeArea/Layout/HeaderPanel/HeaderLayout/TopRow" unique_id=1941625648]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(350, 0)
-layout_mode = 2
-theme_override_font_sizes/font_size = 13
-text = "FIELD READY"
-horizontal_alignment = 1
-
-[node name="Actions" type="HBoxContainer" parent="GameScreen/SafeArea/Layout/HeaderPanel/HeaderLayout/TopRow" unique_id=510909999]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="RestartFieldButton" type="Button" parent="GameScreen/SafeArea/Layout/HeaderPanel/HeaderLayout/TopRow/Actions" unique_id=1672089297]
-unique_name_in_owner = true
-layout_mode = 2
-text = "RESTART FIELD"
-
-[node name="ShiftFieldButton" type="Button" parent="GameScreen/SafeArea/Layout/HeaderPanel/HeaderLayout/TopRow/Actions" unique_id=1178804303]
-unique_name_in_owner = true
-layout_mode = 2
-disabled = true
-text = "SHIFT FIELD"
-
-[node name="AbandonButton" type="Button" parent="GameScreen/SafeArea/Layout/HeaderPanel/HeaderLayout/TopRow/Actions" unique_id=710787288]
-unique_name_in_owner = true
-layout_mode = 2
-text = "ABANDON RUN"
-
-[node name="RunPatternsButton" type="Button" parent="GameScreen/SafeArea/Layout/HeaderPanel/HeaderLayout/TopRow/Actions" unique_id=346859050]
-unique_name_in_owner = true
-layout_mode = 2
-text = "PATTERNS"
-
-[node name="Metrics" type="HBoxContainer" parent="GameScreen/SafeArea/Layout/HeaderPanel/HeaderLayout" unique_id=936962421]
-layout_mode = 2
-theme_override_constants/separation = 26
-alignment = 1
-
-[node name="ScoreLabel" type="Label" parent="GameScreen/SafeArea/Layout/HeaderPanel/HeaderLayout/Metrics" unique_id=162723272]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_colors/font_color = Color(0.882, 0.914, 0.953, 1)
-theme_override_font_sizes/font_size = 14
-text = "FIELD SCORE 000000"
-
-[node name="RunScoreLabel" type="Label" parent="GameScreen/SafeArea/Layout/HeaderPanel/HeaderLayout/Metrics" unique_id=1292269115]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_colors/font_color = Color(0.396, 0.867, 1, 1)
-theme_override_font_sizes/font_size = 14
-text = "RUN SCORE 000000 + 000000"
-
-[node name="StreakLabel" type="Label" parent="GameScreen/SafeArea/Layout/HeaderPanel/HeaderLayout/Metrics" unique_id=1156293998]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_colors/font_color = Color(0.882, 0.914, 0.953, 1)
-theme_override_font_sizes/font_size = 14
-text = "STREAK 00"
-
-[node name="MultiplierLabel" type="Label" parent="GameScreen/SafeArea/Layout/HeaderPanel/HeaderLayout/Metrics" unique_id=455990822]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(52, 0)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.396, 0.455, 0.541, 1)
-theme_override_font_sizes/font_size = 14
-text = "×1.00"
-
-[node name="ActionsLabel" type="Label" parent="GameScreen/SafeArea/Layout/HeaderPanel/HeaderLayout/Metrics" unique_id=53605274]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_colors/font_color = Color(0.882, 0.914, 0.953, 1)
-theme_override_font_sizes/font_size = 14
-text = "ACTIONS 000"
-
-[node name="MinesLabel" type="Label" parent="GameScreen/SafeArea/Layout/HeaderPanel/HeaderLayout/Metrics" unique_id=1671798733]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_colors/font_color = Color(0.882, 0.914, 0.953, 1)
-theme_override_font_sizes/font_size = 14
-text = "MINES 010"
-
-[node name="TimeLabel" type="Label" parent="GameScreen/SafeArea/Layout/HeaderPanel/HeaderLayout/Metrics" unique_id=1555015254]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_colors/font_color = Color(0.882, 0.914, 0.953, 1)
-theme_override_font_sizes/font_size = 14
-text = "TIME 000"
-
-[node name="TargetRow" type="HBoxContainer" parent="GameScreen/SafeArea/Layout/HeaderPanel/HeaderLayout" unique_id=359139258]
-layout_mode = 2
-theme_override_constants/separation = 14
-
-[node name="TargetLabel" type="Label" parent="GameScreen/SafeArea/Layout/HeaderPanel/HeaderLayout/TargetRow" unique_id=1838332278]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(190, 0)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.62, 0.69, 0.79, 1)
-theme_override_font_sizes/font_size = 12
-text = "TARGET 0 / 450"
-
-[node name="TargetProgress" type="ProgressBar" parent="GameScreen/SafeArea/Layout/HeaderPanel/HeaderLayout/TargetRow" unique_id=2029585314]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 9)
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 4
-max_value = 450.0
-show_percentage = false
-
-[node name="PatternMetrics" type="HBoxContainer" parent="GameScreen/SafeArea/Layout/HeaderPanel/HeaderLayout" unique_id=1843587980]
-layout_mode = 2
-theme_override_constants/separation = 34
-alignment = 1
-
-[node name="PatternScoreLabel" type="Label" parent="GameScreen/SafeArea/Layout/HeaderPanel/HeaderLayout/PatternMetrics" unique_id=263671034]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_colors/font_color = Color(0.404, 0.91, 0.647, 1)
-theme_override_font_sizes/font_size = 12
-text = "PATTERN SCORE 000000"
-
-[node name="PatternCountLabel" type="Label" parent="GameScreen/SafeArea/Layout/HeaderPanel/HeaderLayout/PatternMetrics" unique_id=141001473]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_colors/font_color = Color(0.62, 0.69, 0.79, 1)
-theme_override_font_sizes/font_size = 12
-text = "PATTERNS 00"
-
-[node name="LastPatternLabel" type="Label" parent="GameScreen/SafeArea/Layout/HeaderPanel/HeaderLayout/PatternMetrics" unique_id=458630369]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(180, 0)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.62, 0.69, 0.79, 1)
-theme_override_font_sizes/font_size = 12
-text = "LAST NONE"
-
-[node name="PlayArea" type="CenterContainer" parent="GameScreen/SafeArea/Layout" unique_id=1350818546]
-layout_mode = 2
-size_flags_vertical = 3
-
-[node name="ContentRow" type="HBoxContainer" parent="GameScreen/SafeArea/Layout/PlayArea" unique_id=832801995]
-layout_mode = 2
-theme_override_constants/separation = 18
-
-[node name="FieldPanel" type="PanelContainer" parent="GameScreen/SafeArea/Layout/PlayArea/ContentRow" unique_id=1693760131]
-unique_name_in_owner = true
-layout_mode = 2
-
-[node name="FieldLayout" type="VBoxContainer" parent="GameScreen/SafeArea/Layout/PlayArea/ContentRow/FieldPanel" unique_id=263151870]
+[node name="GameLayout" type="VBoxContainer" parent="GameScreen/GameMargin" unique_id=1490668326]
 layout_mode = 2
 theme_override_constants/separation = 12
 
-[node name="TopRule" type="HBoxContainer" parent="GameScreen/SafeArea/Layout/PlayArea/ContentRow/FieldPanel/FieldLayout" unique_id=54961774]
+[node name="TopBar" type="PanelContainer" parent="GameScreen/GameMargin/GameLayout" unique_id=1872063520]
+custom_minimum_size = Vector2(0, 66)
 layout_mode = 2
 
-[node name="Coordinates" type="Label" parent="GameScreen/SafeArea/Layout/PlayArea/ContentRow/FieldPanel/FieldLayout/TopRule" unique_id=1087082186]
-unique_name_in_owner = true
+[node name="TopMargin" type="MarginContainer" parent="GameScreen/GameMargin/GameLayout/TopBar" unique_id=1843379235]
 layout_mode = 2
-size_flags_horizontal = 3
-theme_override_colors/font_color = Color(0.31, 0.38, 0.48, 1)
-theme_override_font_sizes/font_size = 10
-text = "GRID 09×09"
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 10
 
-[node name="Protocol" type="Label" parent="GameScreen/SafeArea/Layout/PlayArea/ContentRow/FieldPanel/FieldLayout/TopRule" unique_id=1475576934]
+[node name="TopContent" type="HBoxContainer" parent="GameScreen/GameMargin/GameLayout/TopBar/TopMargin" unique_id=607116045]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.31, 0.38, 0.48, 1)
-theme_override_font_sizes/font_size = 10
-text = "SAFE-START ENABLED"
+theme_override_constants/separation = 16
 
-[node name="BoardView" type="GridContainer" parent="GameScreen/SafeArea/Layout/PlayArea/ContentRow/FieldPanel/FieldLayout" unique_id=2044894890]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/h_separation = 3
-theme_override_constants/v_separation = 3
-columns = 9
-script = ExtResource("3_board")
-
-[node name="Help" type="Label" parent="GameScreen/SafeArea/Layout/PlayArea/ContentRow/FieldPanel/FieldLayout" unique_id=2025239954]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.408, 0.478, 0.584, 1)
-theme_override_font_sizes/font_size = 10
-text = "LMB REVEAL / CHORD   //   RMB MARK   //   R RESTART FIELD"
-horizontal_alignment = 1
-
-[node name="ResultPanel" type="PanelContainer" parent="GameScreen/SafeArea/Layout/PlayArea/ContentRow" unique_id=1170808372]
-unique_name_in_owner = true
-visible = false
-custom_minimum_size = Vector2(330, 0)
-layout_mode = 2
-
-[node name="ResultLayout" type="VBoxContainer" parent="GameScreen/SafeArea/Layout/PlayArea/ContentRow/ResultPanel" unique_id=1365976157]
-layout_mode = 2
-theme_override_constants/separation = 10
-
-[node name="ResultEyebrow" type="Label" parent="GameScreen/SafeArea/Layout/PlayArea/ContentRow/ResultPanel/ResultLayout" unique_id=1915620238]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.31, 0.38, 0.48, 1)
-theme_override_font_sizes/font_size = 10
-text = "FIELD REPORT // CONFIRMED"
-
-[node name="ResultTitle" type="Label" parent="GameScreen/SafeArea/Layout/PlayArea/ContentRow/ResultPanel/ResultLayout" unique_id=412327841]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_font_sizes/font_size = 20
-text = "FIELD 1 CLEARED"
-
-[node name="Divider" type="HSeparator" parent="GameScreen/SafeArea/Layout/PlayArea/ContentRow/ResultPanel/ResultLayout" unique_id=2098316425]
-layout_mode = 2
-
-[node name="ResultBody" type="Label" parent="GameScreen/SafeArea/Layout/PlayArea/ContentRow/ResultPanel/ResultLayout" unique_id=1841782899]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_vertical = 3
-theme_override_colors/font_color = Color(0.69, 0.74, 0.82, 1)
-theme_override_font_sizes/font_size = 11
-text = "FIELD DATA"
-
-[node name="ResultButton" type="Button" parent="GameScreen/SafeArea/Layout/PlayArea/ContentRow/ResultPanel/ResultLayout" unique_id=175564885]
-unique_name_in_owner = true
-layout_mode = 2
-text = "ENTER FIELD 2"
-
-[node name="StartScreen" type="Control" parent="." unique_id=857899371]
-unique_name_in_owner = true
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-
-[node name="StartCenter" type="CenterContainer" parent="StartScreen" unique_id=582394776]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-
-[node name="StartPanel" type="PanelContainer" parent="StartScreen/StartCenter" unique_id=73188433]
-custom_minimum_size = Vector2(500, 0)
-layout_mode = 2
-
-[node name="StartLayout" type="VBoxContainer" parent="StartScreen/StartCenter/StartPanel" unique_id=1725442588]
-layout_mode = 2
-theme_override_constants/separation = 18
-
-[node name="StartEyebrow" type="Label" parent="StartScreen/StartCenter/StartPanel/StartLayout" unique_id=1038892500]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.31, 0.38, 0.48, 1)
-theme_override_font_sizes/font_size = 11
-text = "RUN PROTOCOL // READY"
-horizontal_alignment = 1
-
-[node name="StartTitle" type="Label" parent="StartScreen/StartCenter/StartPanel/StartLayout" unique_id=1812733126]
+[node name="Brand" type="Label" parent="GameScreen/GameMargin/GameLayout/TopBar/TopMargin/TopContent" unique_id=1600033018]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.396, 0.867, 1, 1)
-theme_override_font_sizes/font_size = 42
+theme_override_font_sizes/font_size = 22
+text = "MINESHIFT"
+vertical_alignment = 1
+
+[node name="FieldLabel" type="Label" parent="GameScreen/GameMargin/GameLayout/TopBar/TopMargin/TopContent" unique_id=1543766080]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "FIELD 1 / 5"
+vertical_alignment = 1
+
+[node name="MetricSpacer" type="Control" parent="GameScreen/GameMargin/GameLayout/TopBar/TopMargin/TopContent" unique_id=1750842265]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="StateLabel" type="Label" parent="GameScreen/GameMargin/GameLayout/TopBar/TopMargin/TopContent" unique_id=1969227304]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "READY"
+vertical_alignment = 1
+
+[node name="MinesLabel" type="Label" parent="GameScreen/GameMargin/GameLayout/TopBar/TopMargin/TopContent" unique_id=985484577]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "MINES 10"
+vertical_alignment = 1
+
+[node name="TimeLabel" type="Label" parent="GameScreen/GameMargin/GameLayout/TopBar/TopMargin/TopContent" unique_id=905760592]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(90, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "TIME 0:00"
+vertical_alignment = 1
+
+[node name="ControlSpacer" type="Control" parent="GameScreen/GameMargin/GameLayout/TopBar/TopMargin/TopContent" unique_id=526103411]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="RestartButton" type="Button" parent="GameScreen/GameMargin/GameLayout/TopBar/TopMargin/TopContent" unique_id=637083149]
+unique_name_in_owner = true
+layout_mode = 2
+text = "RESTART"
+
+[node name="PauseButton" type="Button" parent="GameScreen/GameMargin/GameLayout/TopBar/TopMargin/TopContent" unique_id=14666750]
+unique_name_in_owner = true
+layout_mode = 2
+text = "PAUSE"
+
+[node name="AbandonButton" type="Button" parent="GameScreen/GameMargin/GameLayout/TopBar/TopMargin/TopContent" unique_id=1665715703]
+unique_name_in_owner = true
+layout_mode = 2
+text = "ABANDON"
+
+[node name="MainArea" type="CenterContainer" parent="GameScreen/GameMargin/GameLayout" unique_id=185322773]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="BoardFrame" type="PanelContainer" parent="GameScreen/GameMargin/GameLayout/MainArea" unique_id=449102064]
+layout_mode = 2
+
+[node name="BoardMargin" type="MarginContainer" parent="GameScreen/GameMargin/GameLayout/MainArea/BoardFrame" unique_id=2049988104]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 8
+
+[node name="BoardView" type="GridContainer" parent="GameScreen/GameMargin/GameLayout/MainArea/BoardFrame/BoardMargin" unique_id=1847148195]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/h_separation = 2
+theme_override_constants/v_separation = 2
+script = ExtResource("3_board")
+
+[node name="StartScreen" type="Control" parent="." unique_id=1670366462]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="StartCenter" type="CenterContainer" parent="StartScreen" unique_id=1679699686]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="StartPanel" type="PanelContainer" parent="StartScreen/StartCenter" unique_id=1536200868]
+custom_minimum_size = Vector2(510, 380)
+layout_mode = 2
+
+[node name="StartMargin" type="MarginContainer" parent="StartScreen/StartCenter/StartPanel" unique_id=193623264]
+layout_mode = 2
+theme_override_constants/margin_left = 38
+theme_override_constants/margin_top = 32
+theme_override_constants/margin_right = 38
+theme_override_constants/margin_bottom = 32
+
+[node name="StartLayout" type="VBoxContainer" parent="StartScreen/StartCenter/StartPanel/StartMargin" unique_id=398400813]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="StartTitle" type="Label" parent="StartScreen/StartCenter/StartPanel/StartMargin/StartLayout" unique_id=1986304823]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.396, 0.867, 1, 1)
+theme_override_font_sizes/font_size = 38
 text = "MINESHIFT"
 horizontal_alignment = 1
 
-[node name="StartSubtitle" type="Label" parent="StartScreen/StartCenter/StartPanel/StartLayout" unique_id=83016448]
+[node name="StartSubtitle" type="Label" parent="StartScreen/StartCenter/StartPanel/StartMargin/StartLayout" unique_id=1262803364]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.69, 0.74, 0.82, 1)
-theme_override_font_sizes/font_size = 15
+theme_override_colors/font_color = Color(0.607, 0.659, 0.737, 1)
+theme_override_font_sizes/font_size = 16
 text = "A MINESWEEPER ROGUELIKE"
 horizontal_alignment = 1
 
-[node name="StartRule" type="HSeparator" parent="StartScreen/StartCenter/StartPanel/StartLayout" unique_id=1478675397]
+[node name="StartDivider" type="HSeparator" parent="StartScreen/StartCenter/StartPanel/StartMargin/StartLayout" unique_id=388569886]
 layout_mode = 2
 
-[node name="StartControls" type="Label" parent="StartScreen/StartCenter/StartPanel/StartLayout" unique_id=350421557]
+[node name="Controls" type="Label" parent="StartScreen/StartCenter/StartPanel/StartMargin/StartLayout" unique_id=1491528341]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.52, 0.59, 0.69, 1)
-theme_override_font_sizes/font_size = 13
-text = "LEFT CLICK — REVEAL
-RIGHT CLICK — FLAG
-R — RESTART FIELD"
+text = "LEFT CLICK  Reveal or chord
+RIGHT CLICK  Mark a mine
+R  Restart field
+ESC  Pause"
 horizontal_alignment = 1
 
-[node name="StartRunButton" type="Button" parent="StartScreen/StartCenter/StartPanel/StartLayout" unique_id=1279398260]
+[node name="StartSpacer" type="Control" parent="StartScreen/StartCenter/StartPanel/StartMargin/StartLayout" unique_id=68303224]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="StartRunButton" type="Button" parent="StartScreen/StartCenter/StartPanel/StartMargin/StartLayout" unique_id=2108200393]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 50)
 layout_mode = 2
 text = "START RUN"
 
-[node name="MenuPatternsButton" type="Button" parent="StartScreen/StartCenter/StartPanel/StartLayout" unique_id=946473310]
-unique_name_in_owner = true
-layout_mode = 2
-text = "PATTERNS"
-
-[node name="RunSummaryScreen" type="Control" parent="." unique_id=372432926]
+[node name="FieldResultScreen" type="Control" parent="." unique_id=1624974860]
 unique_name_in_owner = true
 visible = false
 layout_mode = 1
@@ -387,16 +222,16 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="SummaryShade" type="ColorRect" parent="RunSummaryScreen" unique_id=1338944820]
+[node name="Shade" type="ColorRect" parent="FieldResultScreen" unique_id=504675980]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.015, 0.024, 0.039, 0.96)
+color = Color(0.015, 0.027, 0.047, 0.88)
 
-[node name="SummaryCenter" type="CenterContainer" parent="RunSummaryScreen" unique_id=396443684]
+[node name="Center" type="CenterContainer" parent="FieldResultScreen" unique_id=2079594033]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -404,53 +239,123 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="SummaryPanel" type="PanelContainer" parent="RunSummaryScreen/SummaryCenter" unique_id=2141084911]
-custom_minimum_size = Vector2(520, 0)
+[node name="Panel" type="PanelContainer" parent="FieldResultScreen/Center" unique_id=1170840382]
+custom_minimum_size = Vector2(440, 300)
 layout_mode = 2
 
-[node name="SummaryLayout" type="VBoxContainer" parent="RunSummaryScreen/SummaryCenter/SummaryPanel" unique_id=1138030737]
+[node name="Margin" type="MarginContainer" parent="FieldResultScreen/Center/Panel" unique_id=412552473]
 layout_mode = 2
-theme_override_constants/separation = 15
+theme_override_constants/margin_left = 36
+theme_override_constants/margin_top = 30
+theme_override_constants/margin_right = 36
+theme_override_constants/margin_bottom = 30
 
-[node name="SummaryEyebrow" type="Label" parent="RunSummaryScreen/SummaryCenter/SummaryPanel/SummaryLayout" unique_id=1659849138]
+[node name="Layout" type="VBoxContainer" parent="FieldResultScreen/Center/Panel/Margin" unique_id=484741210]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.31, 0.38, 0.48, 1)
-theme_override_font_sizes/font_size = 11
-text = "RUN REPORT // FINAL"
+theme_override_constants/separation = 18
 
-[node name="RunSummaryTitle" type="Label" parent="RunSummaryScreen/SummaryCenter/SummaryPanel/SummaryLayout" unique_id=1207850783]
+[node name="FieldResultTitle" type="Label" parent="FieldResultScreen/Center/Panel/Margin/Layout" unique_id=519038950]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 28
-text = "RUN CLEARED"
+text = "FIELD CLEARED"
+horizontal_alignment = 1
 
-[node name="SummaryDivider" type="HSeparator" parent="RunSummaryScreen/SummaryCenter/SummaryPanel/SummaryLayout" unique_id=1150493485]
-layout_mode = 2
-
-[node name="RunSummaryBody" type="Label" parent="RunSummaryScreen/SummaryCenter/SummaryPanel/SummaryLayout" unique_id=655424941]
+[node name="FieldResultBody" type="Label" parent="FieldResultScreen/Center/Panel/Margin/Layout" unique_id=148187635]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.69, 0.74, 0.82, 1)
-theme_override_font_sizes/font_size = 14
-text = "RUN DATA"
+size_flags_vertical = 3
+theme_override_font_sizes/font_size = 17
+text = "TIME  0:00
+MINES  10
 
-[node name="SummaryButtons" type="HBoxContainer" parent="RunSummaryScreen/SummaryCenter/SummaryPanel/SummaryLayout" unique_id=811342891]
+NEXT  9×9 · 12 MINES"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="NextFieldButton" type="Button" parent="FieldResultScreen/Center/Panel/Margin/Layout" unique_id=1040044258]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 48)
 layout_mode = 2
-theme_override_constants/separation = 12
+text = "ENTER FIELD 2"
 
-[node name="RunPrimaryButton" type="Button" parent="RunSummaryScreen/SummaryCenter/SummaryPanel/SummaryLayout/SummaryButtons" unique_id=1271757517]
+[node name="RunSummaryScreen" type="Control" parent="." unique_id=1859908929]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Shade" type="ColorRect" parent="RunSummaryScreen" unique_id=1469898700]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.015, 0.027, 0.047, 0.9)
+
+[node name="Center" type="CenterContainer" parent="RunSummaryScreen" unique_id=1289770036]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Panel" type="PanelContainer" parent="RunSummaryScreen/Center" unique_id=515733254]
+custom_minimum_size = Vector2(480, 330)
+layout_mode = 2
+
+[node name="Margin" type="MarginContainer" parent="RunSummaryScreen/Center/Panel" unique_id=684995170]
+layout_mode = 2
+theme_override_constants/margin_left = 38
+theme_override_constants/margin_top = 32
+theme_override_constants/margin_right = 38
+theme_override_constants/margin_bottom = 32
+
+[node name="Layout" type="VBoxContainer" parent="RunSummaryScreen/Center/Panel/Margin" unique_id=1621923799]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="RunSummaryTitle" type="Label" parent="RunSummaryScreen/Center/Panel/Margin/Layout" unique_id=39809744]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 30
+text = "RUN CLEARED"
+horizontal_alignment = 1
+
+[node name="RunSummaryBody" type="Label" parent="RunSummaryScreen/Center/Panel/Margin/Layout" unique_id=1468318241]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_font_sizes/font_size = 18
+text = "5 FIELDS CLEARED
+TOTAL TIME  0:00"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="SummaryButtons" type="HBoxContainer" parent="RunSummaryScreen/Center/Panel/Margin/Layout" unique_id=1912026574]
+layout_mode = 2
+theme_override_constants/separation = 10
+alignment = 1
+
+[node name="RetryRunButton" type="Button" parent="RunSummaryScreen/Center/Panel/Margin/Layout/SummaryButtons" unique_id=410384197]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 text = "NEW RUN"
 
-[node name="MainMenuButton" type="Button" parent="RunSummaryScreen/SummaryCenter/SummaryPanel/SummaryLayout/SummaryButtons" unique_id=680413891]
+[node name="SummaryMenuButton" type="Button" parent="RunSummaryScreen/Center/Panel/Margin/Layout/SummaryButtons" unique_id=1650569450]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 text = "MAIN MENU"
 
-[node name="CatalogScreen" type="Control" parent="." unique_id=1720529824]
+[node name="PauseScreen" type="Control" parent="." unique_id=1047577383]
 unique_name_in_owner = true
 visible = false
 layout_mode = 1
@@ -460,62 +365,16 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="CatalogShade" type="ColorRect" parent="CatalogScreen" unique_id=1587964293]
+[node name="Shade" type="ColorRect" parent="PauseScreen" unique_id=139484732]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.015, 0.024, 0.039, 0.96)
+color = Color(0.015, 0.027, 0.047, 0.88)
 
-[node name="CatalogCenter" type="CenterContainer" parent="CatalogScreen" unique_id=1545379299]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-
-[node name="CatalogPanel" type="PanelContainer" parent="CatalogScreen/CatalogCenter" unique_id=905197203]
-custom_minimum_size = Vector2(900, 650)
-layout_mode = 2
-
-[node name="CatalogLayout" type="VBoxContainer" parent="CatalogScreen/CatalogCenter/CatalogPanel" unique_id=60782888]
-layout_mode = 2
-theme_override_constants/separation = 10
-
-[node name="CatalogTitle" type="Label" parent="CatalogScreen/CatalogCenter/CatalogPanel/CatalogLayout" unique_id=1448930732]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.396, 0.867, 1, 1)
-theme_override_font_sizes/font_size = 24
-text = "PATTERN CATALOG"
-
-[node name="CatalogSubtitle" type="Label" parent="CatalogScreen/CatalogCenter/CatalogPanel/CatalogLayout" unique_id=1617550665]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.408, 0.478, 0.584, 1)
-theme_override_font_sizes/font_size = 11
-text = "DETECTION RULES // RUN ACTIVATIONS // BEST OCCURRENCE"
-
-[node name="CatalogDivider" type="HSeparator" parent="CatalogScreen/CatalogCenter/CatalogPanel/CatalogLayout" unique_id=416886081]
-layout_mode = 2
-
-[node name="CatalogBody" type="Label" parent="CatalogScreen/CatalogCenter/CatalogPanel/CatalogLayout" unique_id=1796021257]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_vertical = 3
-theme_override_colors/font_color = Color(0.69, 0.74, 0.82, 1)
-theme_override_font_sizes/font_size = 10
-text = "PATTERN DEFINITIONS"
-
-[node name="CloseCatalogButton" type="Button" parent="CatalogScreen/CatalogCenter/CatalogPanel/CatalogLayout" unique_id=1636842749]
-unique_name_in_owner = true
-layout_mode = 2
-text = "CLOSE"
-
-[node name="AbandonOverlay" type="Control" parent="." unique_id=611124505]
-unique_name_in_owner = true
-visible = false
+[node name="Center" type="CenterContainer" parent="PauseScreen" unique_id=722640032]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -523,85 +382,121 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="AbandonShade" type="ColorRect" parent="AbandonOverlay" unique_id=1784934390]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-color = Color(0.015, 0.024, 0.039, 0.82)
-
-[node name="AbandonCenter" type="CenterContainer" parent="AbandonOverlay" unique_id=460891982]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-
-[node name="AbandonPanel" type="PanelContainer" parent="AbandonOverlay/AbandonCenter" unique_id=536012799]
-custom_minimum_size = Vector2(420, 0)
+[node name="Panel" type="PanelContainer" parent="PauseScreen/Center" unique_id=1837833087]
+custom_minimum_size = Vector2(400, 390)
 layout_mode = 2
 
-[node name="AbandonLayout" type="VBoxContainer" parent="AbandonOverlay/AbandonCenter/AbandonPanel" unique_id=1223108449]
+[node name="Margin" type="MarginContainer" parent="PauseScreen/Center/Panel" unique_id=1273547386]
 layout_mode = 2
-theme_override_constants/separation = 14
+theme_override_constants/margin_left = 38
+theme_override_constants/margin_top = 30
+theme_override_constants/margin_right = 38
+theme_override_constants/margin_bottom = 30
 
-[node name="AbandonTitle" type="Label" parent="AbandonOverlay/AbandonCenter/AbandonPanel/AbandonLayout" unique_id=290523010]
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.443, 0.522, 1)
-theme_override_font_sizes/font_size = 21
-text = "ABANDON RUN?"
-horizontal_alignment = 1
-
-[node name="AbandonCopy" type="Label" parent="AbandonOverlay/AbandonCenter/AbandonPanel/AbandonLayout" unique_id=1734260563]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.62, 0.69, 0.79, 1)
-theme_override_font_sizes/font_size = 13
-text = "ALL RUN PROGRESS WILL BE CLEARED."
-horizontal_alignment = 1
-
-[node name="AbandonButtons" type="HBoxContainer" parent="AbandonOverlay/AbandonCenter/AbandonPanel/AbandonLayout" unique_id=1456698730]
+[node name="Layout" type="VBoxContainer" parent="PauseScreen/Center/Panel/Margin" unique_id=313396534]
 layout_mode = 2
 theme_override_constants/separation = 12
 
-[node name="ConfirmAbandonButton" type="Button" parent="AbandonOverlay/AbandonCenter/AbandonPanel/AbandonLayout/AbandonButtons" unique_id=852671591]
+[node name="Title" type="Label" parent="PauseScreen/Center/Panel/Margin/Layout" unique_id=1116781512]
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "PAUSED"
+horizontal_alignment = 1
+
+[node name="Spacer" type="Control" parent="PauseScreen/Center/Panel/Margin/Layout" unique_id=1706732391]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ResumeButton" type="Button" parent="PauseScreen/Center/Panel/Margin/Layout" unique_id=1329014314]
 unique_name_in_owner = true
 layout_mode = 2
-size_flags_horizontal = 3
+text = "RESUME"
+
+[node name="PauseRestartButton" type="Button" parent="PauseScreen/Center/Panel/Margin/Layout" unique_id=1025734974]
+unique_name_in_owner = true
+layout_mode = 2
+text = "RESTART FIELD"
+
+[node name="PauseAbandonButton" type="Button" parent="PauseScreen/Center/Panel/Margin/Layout" unique_id=2125001800]
+unique_name_in_owner = true
+layout_mode = 2
 text = "ABANDON RUN"
 
-[node name="CancelAbandonButton" type="Button" parent="AbandonOverlay/AbandonCenter/AbandonPanel/AbandonLayout/AbandonButtons" unique_id=1167210418]
+[node name="PauseMenuButton" type="Button" parent="PauseScreen/Center/Panel/Margin/Layout" unique_id=1784408322]
+unique_name_in_owner = true
+layout_mode = 2
+text = "MAIN MENU"
+
+[node name="ConfirmOverlay" type="Control" parent="." unique_id=1534081546]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Shade" type="ColorRect" parent="ConfirmOverlay" unique_id=1569333006]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.015, 0.027, 0.047, 0.94)
+
+[node name="Center" type="CenterContainer" parent="ConfirmOverlay" unique_id=151051497]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Panel" type="PanelContainer" parent="ConfirmOverlay/Center" unique_id=506143414]
+custom_minimum_size = Vector2(450, 270)
+layout_mode = 2
+
+[node name="Margin" type="MarginContainer" parent="ConfirmOverlay/Center/Panel" unique_id=1637494806]
+layout_mode = 2
+theme_override_constants/margin_left = 38
+theme_override_constants/margin_top = 32
+theme_override_constants/margin_right = 38
+theme_override_constants/margin_bottom = 32
+
+[node name="Layout" type="VBoxContainer" parent="ConfirmOverlay/Center/Panel/Margin" unique_id=690577559]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="ConfirmTitle" type="Label" parent="ConfirmOverlay/Center/Panel/Margin/Layout" unique_id=12730683]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.443, 0.522, 1)
+theme_override_font_sizes/font_size = 24
+text = "LEAVE THIS RUN?"
+horizontal_alignment = 1
+
+[node name="ConfirmCopy" type="Label" parent="ConfirmOverlay/Center/Panel/Margin/Layout" unique_id=1555533506]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+text = "Current field progress will be discarded."
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Buttons" type="HBoxContainer" parent="ConfirmOverlay/Center/Panel/Margin/Layout" unique_id=1935287861]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="ConfirmLeaveButton" type="Button" parent="ConfirmOverlay/Center/Panel/Margin/Layout/Buttons" unique_id=198372052]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-text = "KEEP PLAYING"
+text = "LEAVE RUN"
 
-[node name="ScoreFeedback" type="CanvasLayer" parent="." unique_id=955839460]
+[node name="CancelLeaveButton" type="Button" parent="ConfirmOverlay/Center/Panel/Margin/Layout/Buttons" unique_id=826509523]
 unique_name_in_owner = true
-script = ExtResource("4_feedback")
-
-[node name="FeedbackOverlay" type="Control" parent="ScoreFeedback" unique_id=194271190]
-unique_name_in_owner = true
-layout_mode = 3
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-
-[node name="PatternFeedback" type="CanvasLayer" parent="." unique_id=1431878108]
-unique_name_in_owner = true
-script = ExtResource("5_pattern_feedback")
-
-[node name="PatternFeedbackOverlay" type="Control" parent="PatternFeedback" unique_id=30343681]
-unique_name_in_owner = true
-layout_mode = 3
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
+layout_mode = 2
+size_flags_horizontal = 3
+text = "CANCEL"

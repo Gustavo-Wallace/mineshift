@@ -4,7 +4,7 @@ extends Control
 signal reveal_requested(position: Vector2i)
 signal flag_toggle_requested(position: Vector2i)
 
-const DEFAULT_CELL_SIZE := 39.0
+const DEFAULT_CELL_SIZE := 54.0
 const NUMBER_COLORS: Array[Color] = [
 	Color.TRANSPARENT,
 	Color("62c6ff"),
@@ -26,6 +26,7 @@ var exploded := false
 var wrong_flag := false
 var locked := false
 var can_chord := false
+var resolved := false
 
 var _hovered := false
 var _pressed := false
@@ -57,7 +58,8 @@ func set_visual_state(
 	is_exploded: bool = false,
 	is_wrong_flag: bool = false,
 	is_locked: bool = false,
-	is_chord_available: bool = false
+	is_chord_available: bool = false,
+	is_resolved: bool = false
 ) -> void:
 	revealed = is_revealed
 	flagged = is_flagged
@@ -67,6 +69,7 @@ func set_visual_state(
 	wrong_flag = is_wrong_flag
 	locked = is_locked
 	can_chord = is_chord_available
+	resolved = is_resolved
 	mouse_default_cursor_shape = Control.CURSOR_ARROW if locked else Control.CURSOR_POINTING_HAND
 	queue_redraw()
 
@@ -114,7 +117,7 @@ func _draw() -> void:
 	if wrong_flag:
 		_draw_wrong_flag(rect)
 	elif flagged:
-		_draw_flag(rect, Color("65ddff"))
+		_draw_flag(rect, Color("67e8a5") if resolved else Color("65ddff"))
 	elif contains_mine and locked:
 		_draw_mine(rect)
 
@@ -146,6 +149,9 @@ func _draw_revealed(rect: Rect2) -> void:
 	if exploded:
 		fill = Color("6b2433")
 		border = Color("ff7185")
+	elif resolved:
+		fill = Color("142a27")
+		border = Color("67e8a5")
 	draw_rect(rect.grow(-1.0), fill, true)
 	draw_rect(rect.grow(-1.0), border, false, 1.0)
 
@@ -161,26 +167,28 @@ func _draw_number(rect: Rect2) -> void:
 
 func _draw_flag(rect: Rect2, color: Color) -> void:
 	var center := rect.get_center()
-	var pole_x := center.x - 4.0
-	draw_line(Vector2(pole_x, center.y - 11.0), Vector2(pole_x, center.y + 10.0), color, 2.5)
+	var unit := minf(size.x, size.y) / 39.0
+	var pole_x := center.x - 4.0 * unit
+	draw_line(Vector2(pole_x, center.y - 11.0 * unit), Vector2(pole_x, center.y + 10.0 * unit), color, 2.5 * unit)
 	var banner := PackedVector2Array([
-		Vector2(pole_x, center.y - 11.0),
-		Vector2(pole_x + 13.0, center.y - 5.0),
-		Vector2(pole_x, center.y + 1.0),
+		Vector2(pole_x, center.y - 11.0 * unit),
+		Vector2(pole_x + 13.0 * unit, center.y - 5.0 * unit),
+		Vector2(pole_x, center.y + 1.0 * unit),
 	])
 	draw_colored_polygon(banner, color)
-	draw_line(Vector2(pole_x - 7.0, center.y + 11.0), Vector2(pole_x + 7.0, center.y + 11.0), color, 2.5)
+	draw_line(Vector2(pole_x - 7.0 * unit, center.y + 11.0 * unit), Vector2(pole_x + 7.0 * unit, center.y + 11.0 * unit), color, 2.5 * unit)
 
 
 func _draw_mine(rect: Rect2) -> void:
 	var center := rect.get_center()
 	var color := Color("ff7185") if exploded else Color("e3e9f3")
-	draw_circle(center, 7.0, color)
+	var radius := minf(size.x, size.y) * 0.18
+	draw_circle(center, radius, color)
 	for direction in [Vector2.UP, Vector2.RIGHT, Vector2.DOWN, Vector2.LEFT]:
-		draw_line(center + direction * 7.0, center + direction * 12.0, color, 2.0)
+		draw_line(center + direction * radius, center + direction * radius * 1.65, color, 2.0)
 	for direction in [Vector2(1, 1).normalized(), Vector2(-1, 1).normalized(), Vector2(1, -1).normalized(), Vector2(-1, -1).normalized()]:
-		draw_line(center + direction * 7.0, center + direction * 10.5, color, 1.5)
-	draw_circle(center - Vector2(2.0, 2.0), 1.5, Color("141c29"))
+		draw_line(center + direction * radius, center + direction * radius * 1.45, color, 1.5)
+	draw_circle(center - Vector2(radius * 0.3, radius * 0.3), radius * 0.2, Color("141c29"))
 
 
 func _draw_wrong_flag(rect: Rect2) -> void:
