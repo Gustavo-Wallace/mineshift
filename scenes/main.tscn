@@ -4,7 +4,7 @@
 [ext_resource type="Theme" uid="uid://cfmiuq41wdvg7" path="res://resources/themes/mineshift_theme.tres" id="2_theme"]
 [ext_resource type="Script" uid="uid://b40x15f1q0byd" path="res://scripts/ui/board_view.gd" id="3_board"]
 [ext_resource type="Script" uid="uid://5tt1qd7v0ndh" path="res://scripts/ui/score_feedback.gd" id="4_feedback"]
-[ext_resource type="Script" path="res://scripts/ui/pattern_feedback.gd" id="5_pattern_feedback"]
+[ext_resource type="Script" uid="uid://bqebpm5w3dwy0" path="res://scripts/ui/pattern_feedback.gd" id="5_pattern_feedback"]
 
 [node name="Main" type="Control" unique_id=756142053]
 layout_mode = 3
@@ -115,7 +115,7 @@ unique_name_in_owner = true
 layout_mode = 2
 text = "ABANDON RUN"
 
-[node name="RunPatternsButton" type="Button" parent="GameScreen/SafeArea/Layout/HeaderPanel/HeaderLayout/TopRow/Actions"]
+[node name="RunPatternsButton" type="Button" parent="GameScreen/SafeArea/Layout/HeaderPanel/HeaderLayout/TopRow/Actions" unique_id=346859050]
 unique_name_in_owner = true
 layout_mode = 2
 text = "PATTERNS"
@@ -179,33 +179,6 @@ text = "TIME 000"
 layout_mode = 2
 theme_override_constants/separation = 14
 
-[node name="PatternMetrics" type="HBoxContainer" parent="GameScreen/SafeArea/Layout/HeaderPanel/HeaderLayout"]
-layout_mode = 2
-alignment = 1
-theme_override_constants/separation = 34
-
-[node name="PatternScoreLabel" type="Label" parent="GameScreen/SafeArea/Layout/HeaderPanel/HeaderLayout/PatternMetrics"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_colors/font_color = Color(0.404, 0.91, 0.647, 1)
-theme_override_font_sizes/font_size = 12
-text = "PATTERN SCORE 000000"
-
-[node name="PatternCountLabel" type="Label" parent="GameScreen/SafeArea/Layout/HeaderPanel/HeaderLayout/PatternMetrics"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_colors/font_color = Color(0.62, 0.69, 0.79, 1)
-theme_override_font_sizes/font_size = 12
-text = "PATTERNS 00"
-
-[node name="LastPatternLabel" type="Label" parent="GameScreen/SafeArea/Layout/HeaderPanel/HeaderLayout/PatternMetrics"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(180, 0)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.62, 0.69, 0.79, 1)
-theme_override_font_sizes/font_size = 12
-text = "LAST NONE"
-
 [node name="TargetLabel" type="Label" parent="GameScreen/SafeArea/Layout/HeaderPanel/HeaderLayout/TargetRow" unique_id=1838332278]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(190, 0)
@@ -222,6 +195,33 @@ size_flags_horizontal = 3
 size_flags_vertical = 4
 max_value = 450.0
 show_percentage = false
+
+[node name="PatternMetrics" type="HBoxContainer" parent="GameScreen/SafeArea/Layout/HeaderPanel/HeaderLayout" unique_id=1843587980]
+layout_mode = 2
+theme_override_constants/separation = 34
+alignment = 1
+
+[node name="PatternScoreLabel" type="Label" parent="GameScreen/SafeArea/Layout/HeaderPanel/HeaderLayout/PatternMetrics" unique_id=263671034]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.404, 0.91, 0.647, 1)
+theme_override_font_sizes/font_size = 12
+text = "PATTERN SCORE 000000"
+
+[node name="PatternCountLabel" type="Label" parent="GameScreen/SafeArea/Layout/HeaderPanel/HeaderLayout/PatternMetrics" unique_id=141001473]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.69, 0.79, 1)
+theme_override_font_sizes/font_size = 12
+text = "PATTERNS 00"
+
+[node name="LastPatternLabel" type="Label" parent="GameScreen/SafeArea/Layout/HeaderPanel/HeaderLayout/PatternMetrics" unique_id=458630369]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(180, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.69, 0.79, 1)
+theme_override_font_sizes/font_size = 12
+text = "LAST NONE"
 
 [node name="PlayArea" type="CenterContainer" parent="GameScreen/SafeArea/Layout" unique_id=1350818546]
 layout_mode = 2
@@ -372,7 +372,7 @@ unique_name_in_owner = true
 layout_mode = 2
 text = "START RUN"
 
-[node name="MenuPatternsButton" type="Button" parent="StartScreen/StartCenter/StartPanel/StartLayout"]
+[node name="MenuPatternsButton" type="Button" parent="StartScreen/StartCenter/StartPanel/StartLayout" unique_id=946473310]
 unique_name_in_owner = true
 layout_mode = 2
 text = "PATTERNS"
@@ -450,7 +450,7 @@ layout_mode = 2
 size_flags_horizontal = 3
 text = "MAIN MENU"
 
-[node name="CatalogScreen" type="Control" parent="."]
+[node name="CatalogScreen" type="Control" parent="." unique_id=1720529824]
 unique_name_in_owner = true
 visible = false
 layout_mode = 1
@@ -460,7 +460,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="CatalogShade" type="ColorRect" parent="CatalogScreen"]
+[node name="CatalogShade" type="ColorRect" parent="CatalogScreen" unique_id=1587964293]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -469,7 +469,7 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0.015, 0.024, 0.039, 0.96)
 
-[node name="CatalogCenter" type="CenterContainer" parent="CatalogScreen"]
+[node name="CatalogCenter" type="CenterContainer" parent="CatalogScreen" unique_id=1545379299]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -477,30 +477,30 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="CatalogPanel" type="PanelContainer" parent="CatalogScreen/CatalogCenter"]
+[node name="CatalogPanel" type="PanelContainer" parent="CatalogScreen/CatalogCenter" unique_id=905197203]
 custom_minimum_size = Vector2(900, 650)
 layout_mode = 2
 
-[node name="CatalogLayout" type="VBoxContainer" parent="CatalogScreen/CatalogCenter/CatalogPanel"]
+[node name="CatalogLayout" type="VBoxContainer" parent="CatalogScreen/CatalogCenter/CatalogPanel" unique_id=60782888]
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="CatalogTitle" type="Label" parent="CatalogScreen/CatalogCenter/CatalogPanel/CatalogLayout"]
+[node name="CatalogTitle" type="Label" parent="CatalogScreen/CatalogCenter/CatalogPanel/CatalogLayout" unique_id=1448930732]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.396, 0.867, 1, 1)
 theme_override_font_sizes/font_size = 24
 text = "PATTERN CATALOG"
 
-[node name="CatalogSubtitle" type="Label" parent="CatalogScreen/CatalogCenter/CatalogPanel/CatalogLayout"]
+[node name="CatalogSubtitle" type="Label" parent="CatalogScreen/CatalogCenter/CatalogPanel/CatalogLayout" unique_id=1617550665]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.408, 0.478, 0.584, 1)
 theme_override_font_sizes/font_size = 11
 text = "DETECTION RULES // RUN ACTIVATIONS // BEST OCCURRENCE"
 
-[node name="CatalogDivider" type="HSeparator" parent="CatalogScreen/CatalogCenter/CatalogPanel/CatalogLayout"]
+[node name="CatalogDivider" type="HSeparator" parent="CatalogScreen/CatalogCenter/CatalogPanel/CatalogLayout" unique_id=416886081]
 layout_mode = 2
 
-[node name="CatalogBody" type="Label" parent="CatalogScreen/CatalogCenter/CatalogPanel/CatalogLayout"]
+[node name="CatalogBody" type="Label" parent="CatalogScreen/CatalogCenter/CatalogPanel/CatalogLayout" unique_id=1796021257]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
@@ -508,7 +508,7 @@ theme_override_colors/font_color = Color(0.69, 0.74, 0.82, 1)
 theme_override_font_sizes/font_size = 10
 text = "PATTERN DEFINITIONS"
 
-[node name="CloseCatalogButton" type="Button" parent="CatalogScreen/CatalogCenter/CatalogPanel/CatalogLayout"]
+[node name="CloseCatalogButton" type="Button" parent="CatalogScreen/CatalogCenter/CatalogPanel/CatalogLayout" unique_id=1636842749]
 unique_name_in_owner = true
 layout_mode = 2
 text = "CLOSE"
@@ -592,11 +592,11 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="PatternFeedback" type="CanvasLayer" parent="."]
+[node name="PatternFeedback" type="CanvasLayer" parent="." unique_id=1431878108]
 unique_name_in_owner = true
 script = ExtResource("5_pattern_feedback")
 
-[node name="PatternFeedbackOverlay" type="Control" parent="PatternFeedback"]
+[node name="PatternFeedbackOverlay" type="Control" parent="PatternFeedback" unique_id=30343681]
 unique_name_in_owner = true
 layout_mode = 3
 anchors_preset = 15

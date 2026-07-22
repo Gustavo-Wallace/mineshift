@@ -28,6 +28,11 @@ var accuracy_bonus_points := 0
 var efficiency_bonus_points := 0
 var event_history: Array[ScoreEvent] = []
 var completion_bonuses_applied := false
+var modules: ModuleController
+
+
+func set_module_controller(controller: ModuleController) -> void:
+	modules = controller
 
 
 func reset() -> void:
@@ -64,6 +69,8 @@ func record_manual_reveal(
 	automatic_adjacent_counts: Array[int],
 	hit_mine: bool
 ) -> ScoreEvent:
+	if modules != null:
+		modules.begin_action()
 	actions_taken += 1
 	if hit_mine:
 		safe_reveal_streak = 0
@@ -77,10 +84,16 @@ func record_manual_reveal(
 	safe_reveal_streak += 1
 	highest_safe_reveal_streak = maxi(highest_safe_reveal_streak, safe_reveal_streak)
 	var event := _make_event(position, clicked_adjacent_mines, automatic_adjacent_counts, false)
+	var base_multiplier := _get_base_streak_multiplier(safe_reveal_streak)
 	var multiplier := get_streak_multiplier()
 	event.manual_base_score = get_manual_reveal_score(clicked_adjacent_mines)
 	event.streak_multiplier = multiplier
-	event.manual_final_score = int(round(event.manual_base_score * multiplier))
+	var score_before_modules := int(round(event.manual_base_score * base_multiplier))
+	var score_after_streak := int(round(event.manual_base_score * multiplier))
+	if modules != null and score_after_streak > score_before_modules:
+		modules.record_streak_change(score_before_modules, score_after_streak)
+	event.manual_final_score = modules.modify_manual_score(score_after_streak, clicked_adjacent_mines) if modules != null else score_after_streak
+	event.module_bonus_points += event.manual_final_score - score_before_modules
 	event.total_score += event.manual_final_score
 	manual_base_points += event.manual_base_score
 	streak_bonus_points += event.manual_final_score - event.manual_base_score
@@ -96,6 +109,8 @@ func record_chord(
 	automatic_adjacent_counts: Array[int],
 	hit_mine: bool
 ) -> ScoreEvent:
+	if modules != null:
+		modules.begin_action()
 	actions_taken += 1
 	if hit_mine:
 		safe_reveal_streak = 0
@@ -139,19 +154,43 @@ func apply_pattern_points(points: int, event: ScoreEvent = null) -> void:
 	metrics_changed.emit()
 
 
+func apply_global_module_points(points: int, event: ScoreEvent) -> void:
+	if points <= 0:
+		return
+	event.global_module_score += points
+	event.module_bonus_points += points
+	current_score += points
+	metrics_changed.emit()
+
+
+func finalize_event(event: ScoreEvent) -> void:
+	if modules != null:
+		event.module_contributions = modules.action_contributions()
+		event.module_bonus_points = 0
+		for contribution in event.module_contributions:
+			event.module_bonus_points += contribution.points_added
+	score_event_created.emit(event)
+	metrics_changed.emit()
+
+
 func get_manual_reveal_score(adjacent_mines: int) -> int:
 	assert(adjacent_mines >= 0 and adjacent_mines < MANUAL_REVEAL_SCORES.size())
 	return MANUAL_REVEAL_SCORES[adjacent_mines]
 
 
 func get_streak_multiplier() -> float:
-	if safe_reveal_streak >= 10:
+	var base := _get_base_streak_multiplier(safe_reveal_streak)
+	return modules.get_streak_multiplier(safe_reveal_streak, base) if modules != null else base
+
+
+func _get_base_streak_multiplier(streak: int) -> float:
+	if streak >= 10:
 		return 1.75
-	if safe_reveal_streak >= 7:
+	if streak >= 7:
 		return 1.50
-	if safe_reveal_streak >= 5:
+	if streak >= 5:
 		return 1.30
-	if safe_reveal_streak >= 3:
+	if streak >= 3:
 		return 1.15
 	return 1.0
 
@@ -197,5 +236,4 @@ func _make_event(
 func _commit_event(event: ScoreEvent) -> void:
 	current_score += event.total_score
 	event_history.append(event)
-	score_event_created.emit(event)
 	metrics_changed.emit()

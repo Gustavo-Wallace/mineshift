@@ -10,12 +10,19 @@ var manual_final_score := 0
 var cascade_cell_score := 0
 var pattern_score := 0
 var total_score := 0
+var global_module_score := 0
+var module_bonus_points := 0
+var module_contributions: Array[ModuleContribution] = []
 var is_chord := false
 var hit_mine := false
 
 
+func action_total() -> int:
+	return total_score + pattern_score + global_module_score
+
+
 func score_text() -> String:
-	var text := "+%d" % (total_score + pattern_score)
+	var text := "+%d" % action_total()
 	if not is_chord and streak_multiplier > 1.0:
 		text += "  ×%.2f" % streak_multiplier
 	return text

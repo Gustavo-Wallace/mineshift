@@ -8,12 +8,21 @@ const MULTIPLIER_COLOR := Color("67e8a5")
 
 
 func show_score_feedback(screen_position: Vector2, event: ScoreEvent) -> void:
-	if event == null or event.total_score <= 0:
+	if event == null or event.action_total() <= 0:
 		return
 	var score_label := _make_label(event.score_text(), 18, SCORE_COLOR)
 	if event.streak_multiplier > 1.0 and not event.is_chord:
 		score_label.modulate = MULTIPLIER_COLOR
 	_place_and_animate(score_label, screen_position - Vector2(32.0, 24.0), Vector2(0.0, -34.0), 0.85)
+	if not event.module_contributions.is_empty():
+		var lines: Array[String] = ["MODULES"]
+		for contribution in event.module_contributions:
+			if contribution.points_added > 0:
+				lines.append(contribution.feedback_text())
+		if lines.size() > 1:
+			lines.append("TOTAL +%d" % event.action_total())
+			var module_label := _make_label("\n".join(lines), 12, Color("ffca5c"))
+			_place_and_animate(module_label, screen_position + Vector2(48.0, -38.0), Vector2(0.0, -20.0), 1.25)
 
 func clear_feedback() -> void:
 	for child in overlay.get_children():

@@ -31,8 +31,18 @@ var cells_revealed := 0
 var cascade_cells := 0
 var flags_placed := 0
 var correct_flags := 0
+var incorrect_flags := 0
 var highest_streak := 0
 var full_clear := false
+var credit_base := 0
+var credit_overscore := 0
+var credit_full_clear := 0
+var credit_precision := 0
+var credits_earned := 0
+var credits_after := 0
+var credits_awarded := false
+var module_points := 0
+var module_stats: Dictionary = {}
 
 
 func overscore_ratio() -> float:

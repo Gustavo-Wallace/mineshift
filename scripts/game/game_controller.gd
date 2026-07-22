@@ -49,9 +49,10 @@ const MAX_DISPLAY_TIME := 999
 @onready var close_catalog_button: Button = %CloseCatalogButton
 
 var board: BoardModel
-var scoring := ScoreController.new()
-var patterns := PatternController.new()
-var run := RunController.new()
+var scoring: ScoreController = ScoreController.new()
+var patterns: PatternController = PatternController.new()
+var run: RunController = RunController.new()
+var modules: ModuleController = ModuleController.new()
 var state := FieldState.READY
 var elapsed_time := 0.0
 var _displayed_second := -1
@@ -59,9 +60,36 @@ var _last_field_result: FieldResult
 var _action_id := 0
 var _resolving_action := false
 var _catalog_open := false
+var _module_panel_open := false
+var _shop_open := false
+
+var credits_label: Label
+var modules_label: Label
+var modules_button: Button
+var module_slot_strip: HBoxContainer
+var module_slot_labels: Array[Label] = []
+var modules_screen: Control
+var modules_body: Label
+var close_modules_button: Button
+var shop_screen: Control
+var shop_header: Label
+var shop_offers: HBoxContainer
+var shop_build_slots: HBoxContainer
+var shop_feedback: Label
+var reroll_button: Button
+var enter_field_button: Button
+var shop_back_button: Button
+var sale_confirmation: VBoxContainer
+var sale_confirmation_label: Label
+var confirm_sale_button: Button
+var cancel_sale_button: Button
+var shop_offer_buttons: Array[Button] = []
 
 
 func _ready() -> void:
+	scoring.set_module_controller(modules)
+	patterns.set_module_controller(modules)
+	_build_module_interface()
 	board_view.cell_reveal_requested.connect(_on_reveal_requested)
 	board_view.cell_flag_requested.connect(_on_flag_requested)
 	start_run_button.pressed.connect(start_new_run)
@@ -76,13 +104,15 @@ func _ready() -> void:
 	menu_patterns_button.pressed.connect(_show_pattern_catalog)
 	run_patterns_button.pressed.connect(_show_pattern_catalog)
 	close_catalog_button.pressed.connect(_close_pattern_catalog)
+	modules.economy_changed.connect(_refresh_module_hud)
+	modules.build_changed.connect(_refresh_module_hud)
 	scoring.score_event_created.connect(_on_score_event_created)
 	scoring.metrics_changed.connect(_on_score_metrics_changed)
 	_show_main_menu()
 
 
 func _process(delta: float) -> void:
-	if _catalog_open:
+	if _catalog_open or _module_panel_open or _shop_open:
 		return
 	if state != FieldState.PLAYING and state != FieldState.TARGET_REACHED:
 		return
@@ -94,6 +124,16 @@ func _process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _module_panel_open:
+		if event.is_action_pressed("ui_cancel"):
+			_close_module_panel()
+			get_viewport().set_input_as_handled()
+		return
+	if _shop_open:
+		if event.is_action_pressed("ui_cancel"):
+			_close_shop_to_report()
+			get_viewport().set_input_as_handled()
+		return
 	if _catalog_open:
 		if event.is_action_pressed("ui_cancel"):
 			_close_pattern_catalog()
@@ -112,6 +152,9 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func start_new_run() -> void:
 	_close_pattern_catalog()
+	_close_module_panel()
+	_hide_shop()
+	modules.start_run()
 	run.start_run()
 	run_summary_screen.hide()
 	start_screen.hide()
@@ -141,7 +184,10 @@ func shift_current_field() -> void:
 
 
 func return_to_main_menu() -> void:
+	_hide_shop()
+	_close_module_panel()
 	run.abandon_run()
+	modules.abandon_run()
 	scoring.reset()
 	board_view.clear()
 	score_feedback.clear_feedback()
@@ -151,7 +197,13 @@ func return_to_main_menu() -> void:
 
 func _show_main_menu() -> void:
 	_catalog_open = false
+	_module_panel_open = false
+	_shop_open = false
 	catalog_screen.hide()
+	if modules_screen != null:
+		modules_screen.hide()
+	if shop_screen != null:
+		shop_screen.hide()
 	game_screen.hide()
 	run_summary_screen.hide()
 	abandon_overlay.hide()
@@ -170,6 +222,7 @@ func _load_current_field() -> void:
 	board = BoardModel.new(config.width, config.height, config.mine_count)
 	scoring.reset()
 	patterns.reset_field()
+	modules.reset_field()
 	board_view.build(config.width, config.height)
 	coordinates_label.text = "GRID %02d×%02d" % [config.width, config.height]
 	score_feedback.clear_feedback()
@@ -190,6 +243,7 @@ func _on_reveal_requested(cell_position: Vector2i) -> void:
 	if board.is_revealed(cell_position):
 		_try_chord(cell_position)
 		return
+	var target_was_reached := state == FieldState.TARGET_REACHED
 	var is_opening := state == FieldState.READY
 	if is_opening:
 		board.place_mines(cell_position)
@@ -209,6 +263,9 @@ func _on_reveal_requested(cell_position: Vector2i) -> void:
 		[cell_position] if not result["hit_mine"] else [], before_state, is_opening, result["hit_mine"], won
 	)
 	_resolve_patterns(context, score_event)
+	var global_bonus := modules.apply_global_action(score_event.action_total(), target_was_reached)
+	scoring.apply_global_module_points(global_bonus, score_event)
+	scoring.finalize_event(score_event)
 	_resolving_action = false
 	_on_score_metrics_changed()
 
@@ -223,6 +280,7 @@ func _on_reveal_requested(cell_position: Vector2i) -> void:
 func _try_chord(cell_position: Vector2i) -> void:
 	if state != FieldState.PLAYING and state != FieldState.TARGET_REACHED:
 		return
+	var target_was_reached := state == FieldState.TARGET_REACHED
 	var before_state: Dictionary = board.create_snapshot()
 	var result: Dictionary = board.chord(cell_position)
 	if not result["performed"]:
@@ -238,6 +296,9 @@ func _try_chord(cell_position: Vector2i) -> void:
 		[], before_state, false, result["hit_mine"], won
 	)
 	_resolve_patterns(context, score_event)
+	var global_bonus := modules.apply_global_action(score_event.action_total(), target_was_reached)
+	scoring.apply_global_module_points(global_bonus, score_event)
+	scoring.finalize_event(score_event)
 	_resolving_action = false
 	_on_score_metrics_changed()
 	if result["hit_mine"]:
@@ -251,8 +312,10 @@ func _try_chord(cell_position: Vector2i) -> void:
 func _on_flag_requested(cell_position: Vector2i) -> void:
 	if not _field_accepts_input():
 		return
+	var target_was_reached := state == FieldState.TARGET_REACHED
 	var before_state: Dictionary = board.create_snapshot()
 	if board.toggle_flag(cell_position):
+		modules.begin_action()
 		var placed := board.is_flagged(cell_position)
 		_resolving_action = true
 		scoring.record_flag_action(placed)
@@ -268,7 +331,13 @@ func _on_flag_requested(cell_position: Vector2i) -> void:
 		context.before_state = before_state
 		context.after_state = board.create_snapshot()
 		context.safe_streak = scoring.safe_reveal_streak
-		_resolve_patterns(context, null)
+		var flag_event := ScoreEvent.new()
+		flag_event.position = cell_position
+		_resolve_patterns(context, flag_event)
+		var global_bonus := modules.apply_global_action(flag_event.action_total(), target_was_reached)
+		scoring.apply_global_module_points(global_bonus, flag_event)
+		if flag_event.action_total() > 0:
+			scoring.finalize_event(flag_event)
 		_resolving_action = false
 		_on_score_metrics_changed()
 		_update_hud()
@@ -310,6 +379,7 @@ func _confirm_current_field(full_clear: bool) -> void:
 
 	var result := _build_field_result(config, normal_score, flag_counts, full_clear)
 	_last_field_result = result
+	modules.confirm_field(result)
 	run.confirm_field(result)
 	state = FieldState.TRANSITIONING
 	shift_field_button.disabled = true
@@ -352,6 +422,7 @@ func _build_field_result(config: FieldConfig, normal_score: int, flag_counts: Ve
 	result.cascade_cells = scoring.total_cascade_cells
 	result.flags_placed = scoring.flag_placements
 	result.correct_flags = flag_counts.x
+	result.incorrect_flags = flag_counts.y
 	result.highest_streak = scoring.highest_safe_reveal_streak
 	result.full_clear = full_clear
 	return result
@@ -373,6 +444,7 @@ func _finish_loss(exploded_position: Vector2i) -> void:
 		scoring.highest_safe_reveal_streak,
 		patterns.pattern_score
 	)
+	modules.lose_field()
 	shift_field_button.disabled = true
 	restart_field_button.disabled = true
 	abandon_button.disabled = true
@@ -422,6 +494,27 @@ RUN SCORE            %6d""" % [
 		result.confirmed_total,
 		run.confirmed_run_score,
 	]
+	result_body.text += """
+
+CREDIT REPORT
+FIELD CLEAR           +%2d
+OVERSCORE             +%2d
+FULL CLEAR            +%2d
+PRECISION             +%2d
+TOTAL                 +%2d
+CREDITS                %02d
+
+MODULE SCORE          +%6d
+CONTRIBUTORS      %11s""" % [
+		result.credit_base,
+		result.credit_overscore,
+		result.credit_full_clear,
+		result.credit_precision,
+		result.credits_earned,
+		result.credits_after,
+		result.module_points,
+		_field_module_contributors(result),
+	]
 	if run.state == RunController.RunState.RUN_WON:
 		result_button.text = "VIEW RUN SUMMARY"
 	else:
@@ -429,7 +522,7 @@ RUN SCORE            %6d""" % [
 		result_body.text += "\n\nNEXT FIELD %d\nGRID %02d×%02d  //  MINES %02d\nTARGET %04d" % [
 			next.field_number, next.width, next.height, next.mine_count, next.target_score
 		]
-		result_button.text = "ENTER FIELD %d" % next.field_number
+		result_button.text = "OPEN SHIFT SHOP"
 	result_button.disabled = false
 	result_panel.modulate.a = 0.0
 	result_panel.show()
@@ -446,7 +539,9 @@ func _show_field_breach_result() -> void:
 PROVISIONAL LOST     %6d
 TARGET               %6d
 TARGET PROGRESS      %5.1f%%
-SAFE CELLS           %02d/%02d""" % [
+SAFE CELLS           %02d/%02d
+CREDITS RETAINED        %02d
+MODULE POINTS LOST   %6d""" % [
 		config.field_number,
 		run.stages.size(),
 		scoring.current_score,
@@ -454,6 +549,8 @@ SAFE CELLS           %02d/%02d""" % [
 		progress,
 		board.revealed_safe_count,
 		config.width * config.height - config.mine_count,
+		modules.credits,
+		modules.lost_provisional_points,
 	]
 	result_button.text = "RUN BREACHED"
 	result_button.disabled = true
@@ -464,8 +561,7 @@ func _on_result_button_pressed() -> void:
 	if run.state == RunController.RunState.RUN_WON:
 		_show_run_summary(true)
 	elif run.state == RunController.RunState.IN_PROGRESS and state == FieldState.TRANSITIONING:
-		run.begin_next_field()
-		_load_current_field()
+		_show_shift_shop()
 
 
 func _show_run_summary(won: bool) -> void:
@@ -476,6 +572,11 @@ func _show_run_summary(won: bool) -> void:
 		run_summary_title.modulate = Color("67e8a5")
 		run_summary_body.text = """FINAL SCORE              %06d
 FIELDS COMPLETED          %02d
+CREDITS REMAINING          %02d
+FINAL MODULES       %12s
+TOP MODULE ACT.     %12s
+TOP MODULE SCORE    %12s
+MODULE POINTS            %06d
 PATTERN SCORE           %06d
 MOST ACTIVATED     %12s
 TOP PATTERN        %12s
@@ -492,6 +593,11 @@ BEST FIELD SCORE        %06d
 AVERAGE OVERSCORE       %6.1f%%""" % [
 			run.confirmed_run_score,
 			stats.fields_completed,
+			modules.credits,
+			modules.installed_names(),
+			modules.most_activated_module(),
+			modules.highest_scoring_module(),
+			modules.confirmed_points(),
 			stats.pattern_points,
 			stats.most_activated_pattern(),
 			stats.best_pattern_name,
@@ -516,6 +622,10 @@ AVERAGE OVERSCORE       %6.1f%%""" % [
 		run_summary_body.text = """FIELD REACHED             %02d / %02d
 CONFIRMED SCORE          %06d
 PROVISIONAL LOST        %06d
+CREDITS REMAINING          %02d
+INSTALLED MODULES  %12s
+CONFIRMED MODULE PTS     %06d
+LOST MODULE POINTS      %06d
 CONFIRMED PATTERNS      %06d
 LOST PATTERN SCORE     %06d
 FIELD TARGET            %06d
@@ -530,6 +640,10 @@ FULL CLEARS               %02d""" % [
 			run.stages.size(),
 			run.confirmed_run_score,
 			stats.lost_provisional_score,
+			modules.credits,
+			modules.installed_names(),
+			modules.confirmed_points(),
+			modules.lost_provisional_points,
 			stats.pattern_points,
 			stats.lost_provisional_pattern_points,
 			config.target_score,
@@ -684,6 +798,13 @@ func _update_hud() -> void:
 	pattern_count_label.text = "PATTERNS %02d" % patterns.total_patterns
 	last_pattern_label.text = "LAST %s" % patterns.last_pattern
 	run_score_label.text = "RUN SCORE %06d + %06d" % [run.confirmed_run_score, displayed_provisional]
+	modules_label.text = "MODULES %d / %d" % [modules.installed.size(), ModuleController.SLOT_LIMIT]
+	var active_module_status: String = modules.active_global_status(state == FieldState.TARGET_REACHED)
+	if not active_module_status.is_empty():
+		modules_label.text += "  //  %s" % active_module_status
+		modules_label.modulate = Color("67e8a5")
+	else:
+		modules_label.modulate = Color("ffca5c") if modules.installed.size() == ModuleController.SLOT_LIMIT else Color.WHITE
 	_update_target_hud(config, displayed_field_score)
 	_update_time_label()
 	shift_field_button.disabled = state != FieldState.TARGET_REACHED
@@ -721,6 +842,371 @@ func _update_target_hud(config: FieldConfig, displayed_field_score: int) -> void
 
 func _update_time_label() -> void:
 	time_label.text = "TIME %03d" % mini(int(elapsed_time), MAX_DISPLAY_TIME)
+
+
+func _build_module_interface() -> void:
+	var action_row := get_node("GameScreen/SafeArea/Layout/HeaderPanel/HeaderLayout/TopRow/Actions") as HBoxContainer
+	modules_button = Button.new()
+	modules_button.name = "ModulesButton"
+	modules_button.text = "MODULES"
+	modules_button.pressed.connect(_show_module_panel)
+	action_row.add_child(modules_button)
+
+	var pattern_metrics := get_node("GameScreen/SafeArea/Layout/HeaderPanel/HeaderLayout/PatternMetrics") as HBoxContainer
+	credits_label = Label.new()
+	credits_label.name = "CreditsLabel"
+	credits_label.text = "CREDITS 00"
+	credits_label.add_theme_color_override("font_color", Color("65ddff"))
+	pattern_metrics.add_child(credits_label)
+	modules_label = Label.new()
+	modules_label.name = "ModulesLabel"
+	modules_label.text = "MODULES 0 / 5"
+	modules_label.add_theme_color_override("font_color", Color("9aa8bc"))
+	pattern_metrics.add_child(modules_label)
+	var header_layout := get_node("GameScreen/SafeArea/Layout/HeaderPanel/HeaderLayout") as VBoxContainer
+	module_slot_strip = HBoxContainer.new()
+	module_slot_strip.name = "ModuleSlotStrip"
+	module_slot_strip.add_theme_constant_override("separation", 6)
+	header_layout.add_child(module_slot_strip)
+	for slot_index in ModuleController.SLOT_LIMIT:
+		var slot_label := Label.new()
+		slot_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		slot_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		slot_label.add_theme_font_size_override("font_size", 11)
+		module_slot_strip.add_child(slot_label)
+		module_slot_labels.append(slot_label)
+
+	_build_modules_screen()
+	_build_shop_screen()
+	_refresh_module_hud()
+
+
+func _build_modules_screen() -> void:
+	modules_screen = Control.new()
+	modules_screen.name = "ModulesScreen"
+	modules_screen.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	modules_screen.z_index = 80
+	add_child(modules_screen)
+	var shade := ColorRect.new()
+	shade.color = Color(0.02, 0.035, 0.06, 0.94)
+	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	modules_screen.add_child(shade)
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	modules_screen.add_child(center)
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(820.0, 560.0)
+	center.add_child(panel)
+	var layout := VBoxContainer.new()
+	layout.add_theme_constant_override("separation", 12)
+	panel.add_child(layout)
+	var title := Label.new()
+	title.text = "MODULE BUILD // FIVE-SLOT ARRAY"
+	title.add_theme_font_size_override("font_size", 24)
+	title.add_theme_color_override("font_color", Color("67e8a5"))
+	layout.add_child(title)
+	modules_body = Label.new()
+	modules_body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	modules_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	modules_body.add_theme_font_size_override("font_size", 14)
+	layout.add_child(modules_body)
+	close_modules_button = Button.new()
+	close_modules_button.text = "CLOSE"
+	close_modules_button.pressed.connect(_close_module_panel)
+	layout.add_child(close_modules_button)
+	modules_screen.hide()
+
+
+func _build_shop_screen() -> void:
+	shop_screen = Control.new()
+	shop_screen.name = "ShiftShopScreen"
+	shop_screen.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	shop_screen.z_index = 85
+	add_child(shop_screen)
+	var shade := ColorRect.new()
+	shade.color = Color(0.015, 0.03, 0.055, 0.97)
+	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	shop_screen.add_child(shade)
+	var margin := MarginContainer.new()
+	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	margin.add_theme_constant_override("margin_left", 34)
+	margin.add_theme_constant_override("margin_top", 22)
+	margin.add_theme_constant_override("margin_right", 34)
+	margin.add_theme_constant_override("margin_bottom", 22)
+	shop_screen.add_child(margin)
+	var panel := PanelContainer.new()
+	margin.add_child(panel)
+	var layout := VBoxContainer.new()
+	layout.add_theme_constant_override("separation", 10)
+	panel.add_child(layout)
+	shop_header = Label.new()
+	shop_header.add_theme_font_size_override("font_size", 22)
+	shop_header.add_theme_color_override("font_color", Color("65ddff"))
+	layout.add_child(shop_header)
+	var divider := HSeparator.new()
+	layout.add_child(divider)
+	shop_offers = HBoxContainer.new()
+	shop_offers.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	shop_offers.add_theme_constant_override("separation", 12)
+	layout.add_child(shop_offers)
+	var build_title := Label.new()
+	build_title.text = "CURRENT BUILD // SELECT AN INSTALLED MODULE TO SELL"
+	build_title.add_theme_color_override("font_color", Color("9aa8bc"))
+	layout.add_child(build_title)
+	shop_build_slots = HBoxContainer.new()
+	shop_build_slots.add_theme_constant_override("separation", 8)
+	layout.add_child(shop_build_slots)
+	sale_confirmation = VBoxContainer.new()
+	sale_confirmation_label = Label.new()
+	sale_confirmation_label.add_theme_color_override("font_color", Color("ffca5c"))
+	sale_confirmation.add_child(sale_confirmation_label)
+	var sale_buttons := HBoxContainer.new()
+	confirm_sale_button = Button.new()
+	confirm_sale_button.text = "CONFIRM SALE"
+	confirm_sale_button.pressed.connect(_confirm_module_sale)
+	sale_buttons.add_child(confirm_sale_button)
+	cancel_sale_button = Button.new()
+	cancel_sale_button.text = "CANCEL"
+	cancel_sale_button.pressed.connect(_cancel_module_sale)
+	sale_buttons.add_child(cancel_sale_button)
+	sale_confirmation.add_child(sale_buttons)
+	layout.add_child(sale_confirmation)
+	shop_feedback = Label.new()
+	shop_feedback.add_theme_color_override("font_color", Color("67e8a5"))
+	shop_feedback.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	layout.add_child(shop_feedback)
+	var footer := HBoxContainer.new()
+	footer.alignment = BoxContainer.ALIGNMENT_CENTER
+	footer.add_theme_constant_override("separation", 12)
+	reroll_button = Button.new()
+	reroll_button.pressed.connect(_reroll_shop)
+	footer.add_child(reroll_button)
+	shop_back_button = Button.new()
+	shop_back_button.text = "BACK TO REPORT"
+	shop_back_button.pressed.connect(_close_shop_to_report)
+	footer.add_child(shop_back_button)
+	enter_field_button = Button.new()
+	enter_field_button.pressed.connect(_enter_next_field_from_shop)
+	footer.add_child(enter_field_button)
+	layout.add_child(footer)
+	shop_screen.hide()
+
+
+func _refresh_module_hud() -> void:
+	if credits_label == null:
+		return
+	credits_label.text = "CREDITS %02d" % modules.credits
+	modules_label.text = "MODULES %d / %d" % [modules.installed.size(), ModuleController.SLOT_LIMIT]
+	modules_label.modulate = Color("ffca5c") if modules.installed.size() == ModuleController.SLOT_LIMIT else Color.WHITE
+	for slot_index in module_slot_labels.size():
+		var slot_label := module_slot_labels[slot_index]
+		if slot_index < modules.installed.size():
+			var definition := modules.installed[slot_index].definition
+			slot_label.text = "%d %s %s [%s]" % [slot_index + 1, definition.icon_text, definition.short_name, definition.rarity_name()]
+			slot_label.tooltip_text = "%s\n%s\n%s" % [definition.display_name, definition.trigger_text, definition.effect_text]
+			slot_label.modulate = definition.rarity_color()
+		else:
+			slot_label.text = "%d ◇ EMPTY" % (slot_index + 1)
+			slot_label.tooltip_text = "EMPTY MODULE SLOT"
+			slot_label.modulate = Color("65738a")
+	if _module_panel_open:
+		_refresh_module_panel()
+	if _shop_open:
+		_refresh_shop_ui()
+
+
+func _show_module_panel() -> void:
+	if run.state != RunController.RunState.IN_PROGRESS or _shop_open:
+		return
+	_module_panel_open = true
+	score_feedback.clear_feedback()
+	pattern_feedback.clear_feedback()
+	_refresh_module_panel()
+	modules_screen.show()
+	close_modules_button.grab_focus()
+
+
+func _close_module_panel() -> void:
+	_module_panel_open = false
+	if modules_screen != null:
+		modules_screen.hide()
+
+
+func _refresh_module_panel() -> void:
+	var lines: Array[String] = ["CREDITS %02d  //  MODULES %d / %d", ""]
+	lines[0] = lines[0] % [modules.credits, modules.installed.size(), ModuleController.SLOT_LIMIT]
+	for slot_index in ModuleController.SLOT_LIMIT:
+		if slot_index >= modules.installed.size():
+			lines.append("SLOT %d  ◇  EMPTY" % (slot_index + 1))
+			lines.append("")
+			continue
+		var runtime := modules.installed[slot_index]
+		var definition := runtime.definition
+		lines.append("SLOT %d  %s  %s  //  %s" % [slot_index + 1, definition.icon_text, definition.display_name, definition.rarity_name()])
+		lines.append("%s  //  COST %d  //  SELL %d" % [definition.description, definition.cost, definition.sell_value()])
+		lines.append("TRIGGER: %s" % definition.trigger_text)
+		lines.append("CONFIRMED: %d ACT.  //  +%d PTS  //  BEST +%d" % [runtime.confirmed_activations, runtime.confirmed_points, runtime.confirmed_best_contribution])
+		lines.append("CURRENT FIELD: %d ACT.  //  +%d PTS  //  BEST +%d" % [runtime.provisional_activations, runtime.provisional_points, runtime.provisional_best_contribution])
+		lines.append("")
+	modules_body.text = "\n".join(lines)
+
+
+func _show_shift_shop() -> void:
+	if _last_field_result == null or run.state != RunController.RunState.IN_PROGRESS:
+		return
+	modules.prepare_shop(_last_field_result.field_number)
+	_shop_open = true
+	result_panel.hide()
+	_refresh_shop_ui()
+	shop_screen.show()
+	reroll_button.grab_focus()
+
+
+func _hide_shop() -> void:
+	_shop_open = false
+	if shop_screen != null:
+		shop_screen.hide()
+
+
+func _close_shop_to_report() -> void:
+	if not _shop_open:
+		return
+	_hide_shop()
+	result_panel.show()
+	result_button.grab_focus()
+
+
+func _enter_next_field_from_shop() -> void:
+	if not _shop_open or not run.has_pending_next_field:
+		return
+	_hide_shop()
+	run.begin_next_field()
+	_load_current_field()
+
+
+func _refresh_shop_ui() -> void:
+	if not _shop_open:
+		return
+	var next := run.next_config()
+	if next == null:
+		_hide_shop()
+		return
+	shop_header.text = "SHIFT SHOP  //  CREDITS %02d  //  FIELD %d CLEARED  →  FIELD %d" % [modules.credits, modules.shop_field_number, next.field_number]
+	_clear_control_children(shop_offers)
+	shop_offer_buttons.clear()
+	for offer_index in modules.stock.size():
+		var definition := modules.stock[offer_index]
+		var card := PanelContainer.new()
+		card.custom_minimum_size = Vector2(0.0, 250.0)
+		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		shop_offers.add_child(card)
+		var content := VBoxContainer.new()
+		content.add_theme_constant_override("separation", 6)
+		card.add_child(content)
+		if definition == null:
+			var sold := Label.new()
+			sold.text = "◇\nMODULE INSTALLED\nOFFER CLOSED"
+			sold.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			sold.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			sold.size_flags_vertical = Control.SIZE_EXPAND_FILL
+			content.add_child(sold)
+			continue
+		var rarity := Label.new()
+		rarity.text = "%s  //  %s" % [definition.icon_text, definition.rarity_name()]
+		rarity.add_theme_color_override("font_color", definition.rarity_color())
+		content.add_child(rarity)
+		var name_label := Label.new()
+		name_label.text = definition.display_name
+		name_label.add_theme_font_size_override("font_size", 18)
+		content.add_child(name_label)
+		var description := Label.new()
+		description.text = "%s\n\nTRIGGER\n%s\n\nEFFECT\n%s" % [definition.description, definition.trigger_text, definition.effect_text]
+		description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		description.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		content.add_child(description)
+		var buy := Button.new()
+		buy.text = "BUY — %d CREDITS" % definition.cost
+		buy.disabled = modules.credits < definition.cost or modules.installed.size() >= ModuleController.SLOT_LIMIT
+		buy.pressed.connect(_buy_shop_offer.bind(offer_index))
+		content.add_child(buy)
+		shop_offer_buttons.append(buy)
+	_clear_control_children(shop_build_slots)
+	for slot_index in ModuleController.SLOT_LIMIT:
+		var slot := Button.new()
+		slot.custom_minimum_size = Vector2(0.0, 54.0)
+		slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		if slot_index < modules.installed.size():
+			var runtime := modules.installed[slot_index]
+			slot.text = "%s\n%s  //  SELL %d" % [runtime.definition.icon_text, runtime.definition.short_name, runtime.definition.sell_value()]
+			slot.tooltip_text = runtime.definition.description
+			slot.pressed.connect(_request_module_sale.bind(runtime.definition.id))
+		else:
+			slot.text = "◇\nEMPTY SLOT"
+			slot.disabled = true
+		shop_build_slots.add_child(slot)
+	reroll_button.text = "REROLL — %d CREDITS" % modules.reroll_cost()
+	reroll_button.disabled = not modules.can_reroll()
+	enter_field_button.text = "ENTER FIELD %d" % next.field_number
+	sale_confirmation.visible = modules.pending_sale_id != &""
+	if modules.installed.size() >= ModuleController.SLOT_LIMIT:
+		shop_feedback.text = "MODULE SLOTS FULL — SELL A MODULE TO INSTALL ANOTHER"
+	elif not modules.last_transaction_message.is_empty():
+		shop_feedback.text = modules.last_transaction_message
+	else:
+		shop_feedback.text = "STOCK LOCKED UNTIL REROLL"
+
+
+func _buy_shop_offer(index: int) -> void:
+	var result := modules.buy_offer(index)
+	match result:
+		ModuleController.PurchaseResult.SUCCESS:
+			shop_feedback.text = "MODULE INSTALLED"
+		ModuleController.PurchaseResult.INSUFFICIENT_CREDITS:
+			shop_feedback.text = "INSUFFICIENT CREDITS"
+		ModuleController.PurchaseResult.SLOTS_FULL:
+			shop_feedback.text = "MODULE SLOTS FULL"
+	_refresh_shop_ui()
+
+
+func _reroll_shop() -> void:
+	modules.reroll()
+	_refresh_shop_ui()
+
+
+func _request_module_sale(id: StringName) -> void:
+	if not modules.request_sale(id):
+		return
+	var definition := modules.get_definition(id)
+	sale_confirmation_label.text = "SELL %s FOR %d CREDITS?" % [definition.display_name, definition.sell_value()]
+	sale_confirmation.show()
+	confirm_sale_button.grab_focus()
+
+
+func _confirm_module_sale() -> void:
+	modules.confirm_sale()
+	_refresh_shop_ui()
+
+
+func _cancel_module_sale() -> void:
+	modules.cancel_sale()
+	sale_confirmation.hide()
+
+
+func _field_module_contributors(result: FieldResult) -> String:
+	var names: Array[String] = []
+	for id in result.module_stats:
+		var data: Dictionary = result.module_stats[id]
+		if int(data.get("points", 0)) > 0:
+			var definition := modules.get_definition(id)
+			if definition != null:
+				names.append(definition.short_name)
+	return "NONE" if names.is_empty() else ", ".join(names)
+
+
+func _clear_control_children(container: Control) -> void:
+	for child in container.get_children():
+		container.remove_child(child)
+		child.queue_free()
 
 
 func _make_outcome_style(color: Color) -> StyleBoxFlat:

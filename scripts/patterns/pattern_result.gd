@@ -9,6 +9,8 @@ var total_points := 0
 var metric := 0
 var detail := ""
 var source_position := Vector2i(-1, -1)
+var counts_as_activation := true
+var module_source_id: StringName = &""
 
 
 func configure(pattern: PatternDefinition, points: int, result_metric: int, result_detail: String) -> PatternResult:

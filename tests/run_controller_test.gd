@@ -128,6 +128,14 @@ func _test_game_run_flow() -> void:
 	enter_event.pressed = true
 	game._unhandled_input(enter_event)
 	_expect(game.run.state == RunController.RunState.IN_PROGRESS and game.run.current_config().field_number == 1, "Enter must start a new run at Field 1.")
+	game.modules_button.pressed.emit()
+	_expect(game.modules_screen.visible and game.modules_body.text.contains("EMPTY"), "The module panel must expose five empty slots at run start.")
+	_expect(game.module_slot_labels.size() == 5 and game.module_slot_labels[0].text.contains("EMPTY"), "Five compact module slots must remain visible in the run HUD.")
+	var module_panel_elapsed := game.elapsed_time
+	game._process(2.0)
+	_expect(game.elapsed_time == module_panel_elapsed, "Opening the module panel must pause the field timer.")
+	game._unhandled_input(escape_event)
+	_expect(not game.modules_screen.visible, "Escape must close the module panel.")
 	_expect(game.shift_field_button.disabled, "SHIFT FIELD must start disabled.")
 	game._on_reveal_requested(Vector2i(4, 4))
 	var config := game.run.current_config()
@@ -139,6 +147,7 @@ func _test_game_run_flow() -> void:
 	game._on_score_metrics_changed()
 	_expect(game.state == GameController.FieldState.TARGET_REACHED and not game.shift_field_button.disabled, "Reaching the target must unlock SHIFT FIELD.")
 	var actions_at_target := game.scoring.actions_taken
+	game.modules.install_for_test(&"overclock")
 	var safe_closed := _find_safe_closed(game.board)
 	if safe_closed.x >= 0:
 		game._on_flag_requested(safe_closed)
@@ -161,6 +170,7 @@ func _test_game_run_flow() -> void:
 	_expect(game.state == GameController.FieldState.TRANSITIONING, "SHIFT FIELD must lock the completed field.")
 	_expect(game.run.confirmed_run_score > config.target_score and game.run.stats.current_provisional_score == 0, "Shifting must confirm field score and clear provisional score.")
 	_expect(game._last_field_result.overscore_bonus == 100, "The field report must apply overscore after meeting the target.")
+	_expect(game._last_field_result.credits_earned == 7 and game.modules.credits == 7, "Field performance must award base, overscore and precision credits separately from score.")
 	_expect(game.run_score_label.text.ends_with("+ 000000"), "The HUD must stop showing provisional score after confirmation.")
 	var once_confirmed := game.run.confirmed_run_score
 	game.shift_current_field()
@@ -168,10 +178,26 @@ func _test_game_run_flow() -> void:
 
 	for next_field_number in range(2, 6):
 		game.result_button.pressed.emit()
+		_expect(game.shop_screen.visible, "Fields 1-4 must route through the Shift Shop.")
+		if next_field_number == 2:
+			var initial_stock := game.modules.stock_ids()
+			game.shop_back_button.pressed.emit()
+			game.result_button.pressed.emit()
+			_expect(game.modules.stock_ids() == initial_stock, "Closing and reopening the shop must not refresh stock.")
+			game.shop_offer_buttons[0].pressed.emit()
+			_expect(game.modules.installed.size() == 1 and game.modules.credits >= 2, "The guaranteed common offer must be affordable after Field 1.")
+			var installed_id := game.modules.installed[0].definition.id
+			game._request_module_sale(installed_id)
+			_expect(game.sale_confirmation.visible and game.sale_confirmation_label.text.contains("SELL"), "Selecting an installed module must require sale confirmation.")
+			game.cancel_sale_button.pressed.emit()
+			_expect(game.modules.owns(installed_id), "Cancelling the shop sale must keep the module installed.")
+		game.enter_field_button.pressed.emit()
 		config = game.run.current_config()
 		_expect(config.field_number == next_field_number, "ENTER FIELD must load the next configured field.")
 		_expect(game.board.width == config.width and game.board.height == config.height and game.board.mine_count == config.mine_count, "Each field must build its configured board.")
 		_expect(game.board_view.get_child_count() == config.width * config.height, "Board view must match the configured dimensions.")
+		if next_field_number > 2:
+			_expect(game.modules.installed.size() == 1, "Installed modules must persist across fields.")
 		game.state = GameController.FieldState.PLAYING
 		game.scoring.current_score = config.target_score
 		game._on_score_metrics_changed()
@@ -183,6 +209,7 @@ func _test_game_run_flow() -> void:
 	game.main_menu_button.pressed.emit()
 	_expect(game.start_screen.visible and game.run.state == RunController.RunState.NOT_STARTED, "MAIN MENU must clear the run state.")
 	game.start_new_run()
+	_expect(game.modules.credits == 0 and game.modules.installed.is_empty(), "A new run must clear credits and all module slots.")
 	game.start_new_run()
 	game._on_flag_requested(Vector2i(0, 0))
 	_expect(game.scoring.actions_taken == 1, "Repeated menu and run cycles must not duplicate signals.")

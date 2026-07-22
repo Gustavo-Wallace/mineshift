@@ -181,6 +181,9 @@ func _test_scene_lifecycle() -> void:
 	_expect(game.elapsed_time == elapsed_before_win_tick, "The timer must stop after a win.")
 	var confirmed_before_next_field := game.run.confirmed_run_score
 	game.result_button.pressed.emit()
+	_expect(game.shop_screen.visible, "A completed non-final field must open the Shift Shop before progression.")
+	_expect(game.modules.credits > 0 and game.modules.stock.size() == 3, "The shop must retain awarded credits and three offers.")
+	game.enter_field_button.pressed.emit()
 	_expect(game.run.current_config().field_number == 2 and game.board.mine_count == 12, "The field report must advance to the configured next field.")
 
 	var reset_event := InputEventAction.new()

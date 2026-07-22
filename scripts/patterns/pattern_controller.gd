@@ -21,6 +21,7 @@ var highest_action_pattern_score := 0
 var best_pattern_name := "NONE"
 var best_pattern_points := 0
 var result_history: Array[PatternResult] = []
+var modules: ModuleController
 
 var _definitions_by_id: Dictionary = {}
 var _surround_awarded: Dictionary = {}
@@ -30,6 +31,10 @@ var _last_processed_action_id := -1
 func _init() -> void:
 	_create_definitions()
 	reset_field()
+
+
+func set_module_controller(controller: ModuleController) -> void:
+	modules = controller
 
 
 func reset_field() -> void:
@@ -60,14 +65,17 @@ func detect(context: PatternActionContext) -> Array[PatternResult]:
 	_detect_surrounds(context, results)
 	_detect_high_risk(context, results)
 	_detect_cascade(context, results)
+	if modules != null:
+		modules.modify_patterns(results, context)
 	results.sort_custom(_sort_results)
 	var action_points := 0
 	for result in results:
 		action_points += result.total_points
 		pattern_score += result.total_points
-		total_patterns += result.occurrences
-		activations[result.definition.id] = int(activations[result.definition.id]) + result.occurrences
-		best_metrics[result.definition.id] = maxi(int(best_metrics[result.definition.id]), result.metric)
+		if result.counts_as_activation:
+			total_patterns += result.occurrences
+			activations[result.definition.id] = int(activations[result.definition.id]) + result.occurrences
+			best_metrics[result.definition.id] = maxi(int(best_metrics[result.definition.id]), result.metric)
 		if result.total_points > best_pattern_points:
 			best_pattern_points = result.total_points
 			best_pattern_name = result.definition.display_name
