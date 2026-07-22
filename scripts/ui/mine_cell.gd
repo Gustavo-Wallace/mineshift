@@ -39,10 +39,10 @@ func _ready() -> void:
 	queue_redraw()
 
 
-func configure(position: Vector2i, cell_size: float = DEFAULT_CELL_SIZE) -> void:
-	board_position = position
+func configure(cell_position: Vector2i, cell_size: float = DEFAULT_CELL_SIZE) -> void:
+	board_position = cell_position
 	set_cell_size(cell_size)
-	tooltip_text = "Cell %d, %d" % [position.x + 1, position.y + 1]
+	tooltip_text = "Cell %d, %d" % [cell_position.x + 1, cell_position.y + 1]
 
 
 func set_cell_size(cell_size: float) -> void:

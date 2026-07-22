@@ -81,6 +81,10 @@ func _test_run_progression_and_stats() -> void:
 	_expect(run.stats.full_clears == 3, "Full clears must accumulate.")
 	_expect(run.stats.highest_streak == 11, "The run must retain the highest field streak.")
 	_expect(run.stats.best_field_score == 1400, "The run must retain the best field score.")
+	_expect(run.stats.pattern_points == 1500 and run.stats.total_patterns == 15, "Confirmed pattern statistics must accumulate across fields.")
+	_expect(run.stats.pattern_activations.get("cascade", 0) == 15, "Pattern activations must accumulate by type.")
+	_expect(run.stats.pattern_best_metrics.get("cascade", 0) == 5, "Best pattern metrics must retain the run maximum.")
+	_expect(run.stats.best_pattern_field_score == 500, "The run must retain the highest field pattern score.")
 
 
 func _test_loss_at_every_field() -> void:
@@ -108,6 +112,16 @@ func _test_game_run_flow() -> void:
 	root.add_child(game)
 	await process_frame
 	_expect(game.start_screen.visible and not game.game_screen.visible, "The main menu must be the initial visible screen.")
+	game.menu_patterns_button.pressed.emit()
+	_expect(game.catalog_screen.visible and game.catalog_body.text.contains("CHAIN") and game.catalog_body.text.contains("SURROUND"), "The menu catalog must explain all patterns.")
+	var menu_elapsed := game.elapsed_time
+	game._process(2.0)
+	_expect(game.elapsed_time == menu_elapsed, "Opening the catalog must pause the field timer.")
+	var escape_event := InputEventAction.new()
+	escape_event.action = "ui_cancel"
+	escape_event.pressed = true
+	game._unhandled_input(escape_event)
+	_expect(not game.catalog_screen.visible, "Escape must close the pattern catalog.")
 
 	var enter_event := InputEventAction.new()
 	enter_event.action = "ui_accept"
@@ -193,6 +207,13 @@ func _make_result(config: FieldConfig, confirmed_total: int, normal_score: int, 
 	result.correct_flags = 4
 	result.highest_streak = 7 + config.field_number - 1
 	result.full_clear = full_clear
+	result.pattern_score = config.field_number * 100
+	result.pattern_count = config.field_number
+	result.best_pattern_name = "CASCADE %d" % config.field_number
+	result.best_pattern_points = config.field_number * 20
+	result.pattern_activations = {"cascade": config.field_number}
+	result.pattern_best_metrics = {"cascade": config.field_number}
+	result.highest_pattern_action_score = config.field_number * 20
 	return result
 
 

@@ -69,6 +69,17 @@ func confirm_field(result: FieldResult) -> void:
 	stats.highest_streak = maxi(stats.highest_streak, result.highest_streak)
 	stats.best_field_score = maxi(stats.best_field_score, result.confirmed_total)
 	stats.overscore_ratio_sum += result.overscore_ratio()
+	stats.pattern_points += result.pattern_score
+	stats.total_patterns += result.pattern_count
+	stats.highest_pattern_action_score = maxi(stats.highest_pattern_action_score, result.highest_pattern_action_score)
+	stats.best_pattern_field_score = maxi(stats.best_pattern_field_score, result.pattern_score)
+	if result.best_pattern_points > stats.best_pattern_points:
+		stats.best_pattern_points = result.best_pattern_points
+		stats.best_pattern_name = result.best_pattern_name
+	for id in result.pattern_activations:
+		stats.pattern_activations[id] = int(stats.pattern_activations.get(id, 0)) + int(result.pattern_activations[id])
+	for id in result.pattern_best_metrics:
+		stats.pattern_best_metrics[id] = maxi(int(stats.pattern_best_metrics.get(id, 0)), int(result.pattern_best_metrics[id]))
 
 	if current_stage_index == stages.size() - 1:
 		state = RunState.RUN_WON
@@ -84,7 +95,8 @@ func lose_field(
 	cells: int,
 	cascade_cell_count: int,
 	flags: int,
-	highest_streak: int
+	highest_streak: int,
+	provisional_pattern_points: int = 0
 ) -> void:
 	if state != RunState.IN_PROGRESS:
 		return
@@ -97,6 +109,7 @@ func lose_field(
 	stats.cascade_cells += cascade_cell_count
 	stats.flags_placed += flags
 	stats.highest_streak = maxi(stats.highest_streak, highest_streak)
+	stats.lost_provisional_pattern_points = provisional_pattern_points
 	run_state_changed.emit(state)
 
 

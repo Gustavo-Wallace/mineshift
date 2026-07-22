@@ -33,10 +33,10 @@ func _test_risk_scores() -> void:
 func _test_cascade_scoring() -> void:
 	var cases: Array[Dictionary] = [
 		{"counts": [0, 1, 3], "cell_score": 17, "bonus": 0, "message": ""},
-		{"counts": [0, 0, 0, 0], "cell_score": 12, "bonus": 15, "message": ""},
-		{"counts": _filled_counts(8), "cell_score": 24, "bonus": 40, "message": "CASCADE"},
-		{"counts": _filled_counts(15), "cell_score": 45, "bonus": 90, "message": "LARGE CASCADE"},
-		{"counts": _filled_counts(25), "cell_score": 75, "bonus": 175, "message": "MASSIVE CASCADE"},
+		{"counts": [0, 0, 0, 0], "cell_score": 12, "bonus": 0, "message": ""},
+		{"counts": _filled_counts(8), "cell_score": 24, "bonus": 0, "message": ""},
+		{"counts": _filled_counts(15), "cell_score": 45, "bonus": 0, "message": ""},
+		{"counts": _filled_counts(25), "cell_score": 75, "bonus": 0, "message": ""},
 	]
 	for test_case in cases:
 		var scoring := ScoreController.new()
@@ -44,9 +44,7 @@ func _test_cascade_scoring() -> void:
 		counts.assign(test_case["counts"])
 		var event := scoring.record_manual_reveal(Vector2i.ZERO, 0, counts, false)
 		_expect(event.cascade_cell_score == test_case["cell_score"], "Cascade cell score is incorrect.")
-		_expect(event.cascade_size_bonus == test_case["bonus"], "Cascade size bonus is incorrect.")
-		_expect(event.cascade_message == test_case["message"], "Cascade feedback tier is incorrect.")
-		_expect(event.total_score == 5 + test_case["cell_score"] + test_case["bonus"], "Cascade action total is incorrect.")
+		_expect(event.total_score == 5 + test_case["cell_score"], "Cascade action total is incorrect before pattern scoring.")
 
 
 func _test_safe_streak() -> void:
@@ -96,7 +94,6 @@ func _test_score_event_summary() -> void:
 	_expect(is_equal_approx(event.streak_multiplier, 1.15), "Score event must retain the streak multiplier.")
 	_expect(event.manual_final_score == 40, "Score event must retain the rounded manual score.")
 	_expect(event.cascade_cell_score == 10, "Score event must retain cascade cell points.")
-	_expect(event.cascade_size_bonus == 0, "Score event must retain the cascade size bonus.")
 	_expect(event.total_score == 50, "Score event must retain the complete action score.")
 	_expect(scoring.event_history.size() == 3, "Every scoring reveal must be retained in the event history.")
 
@@ -108,7 +105,7 @@ func _test_chord_scoring() -> void:
 	var event := scoring.record_chord(Vector2i.ZERO, 1, [0, 1, 2, 3], false)
 	_expect(event.is_chord, "A chord score event must identify its action type.")
 	_expect(event.manual_final_score == 0, "A chord must not receive a manual reveal score.")
-	_expect(event.cascade_cell_score == 24 and event.cascade_size_bonus == 15, "Chord cells must use cascade scoring and bonuses.")
+	_expect(event.cascade_cell_score == 24, "Chord cells must use cascade cell scoring without duplicating the CASCADE pattern.")
 	_expect(scoring.safe_reveal_streak == streak_before, "A safe chord must not increase the streak.")
 	scoring.record_chord(Vector2i.ZERO, 1, [], true)
 	_expect(scoring.safe_reveal_streak == 0, "A chord that hits a mine must reset the streak.")

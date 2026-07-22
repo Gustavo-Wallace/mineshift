@@ -26,7 +26,7 @@ func _run() -> void:
 func _test_generation_and_counts() -> void:
 	for run_index in GENERATION_RUNS:
 		var board := BoardModel.new(BOARD_WIDTH, BOARD_HEIGHT, MINE_COUNT)
-		var first := Vector2i(run_index % BOARD_WIDTH, (run_index / BOARD_WIDTH) as int % BOARD_HEIGHT)
+		var first := Vector2i(run_index % BOARD_WIDTH, floori(run_index / float(BOARD_WIDTH)) % BOARD_HEIGHT)
 		_expect(not board.mines_are_placed, "Board must begin without mines.")
 		board.place_mines(first)
 		var protected_positions: Array[Vector2i] = [first]
@@ -125,6 +125,8 @@ func _test_scene_lifecycle() -> void:
 	var game := scene.instantiate() as GameController
 	root.add_child(game)
 	await process_frame
+	var pattern_controller := game.get("patterns") as PatternController
+	var pattern_feedback := game.get_node("%PatternFeedback") as PatternFeedback
 	_expect(game.start_screen.visible, "The scene must open on the main menu.")
 	_expect(game.run.state == RunController.RunState.NOT_STARTED, "A run must not start before player input.")
 	game.start_new_run()
@@ -142,6 +144,7 @@ func _test_scene_lifecycle() -> void:
 	game._on_reveal_requested(exploded_position)
 	_expect(game.state == GameController.FieldState.LOST, "Revealing a mine must enter LOST.")
 	_expect(game.run.state == RunController.RunState.RUN_LOST, "Revealing a mine must end the run.")
+	_expect(game.run.stats.lost_provisional_pattern_points == pattern_controller.pattern_score, "A loss must record but not confirm provisional pattern points.")
 	_expect(game.state_label.text == "FIELD BREACHED", "A loss must be clearly labeled.")
 	_expect(game.result_panel.visible, "A loss must display the result panel.")
 	_expect(game.result_body.text.contains("PROVISIONAL LOST"), "The loss result must identify discarded field score.")
@@ -160,6 +163,7 @@ func _test_scene_lifecycle() -> void:
 		_expect(game.state == GameController.FieldState.READY, "Every reset must return to READY.")
 		_expect(game.elapsed_time == 0.0, "Every reset must clear the timer.")
 		_expect(game.scoring.current_score == 0 and game.scoring.actions_taken == 0, "Every reset must clear scoring and actions.")
+		_expect(pattern_controller.pattern_score == 0 and pattern_controller.total_patterns == 0, "Every reset must clear provisional patterns.")
 
 	game._on_reveal_requested(Vector2i(4, 4))
 	for y in BOARD_HEIGHT:
@@ -171,6 +175,7 @@ func _test_scene_lifecycle() -> void:
 	_expect(game.result_panel.visible, "A full clear must display the field report.")
 	_expect(game.result_body.text.contains("FULL CLEAR") and game.result_body.text.contains("OVERSCORE"), "The field report must itemize run bonuses.")
 	_expect(game.run.confirmed_run_score > 0 and game.run.stats.full_clears == 1, "A full clear must confirm score and run statistics.")
+	_expect(game.run.stats.pattern_points == game._last_field_result.pattern_score, "A completed field must confirm its pattern statistics.")
 	var elapsed_before_win_tick := game.elapsed_time
 	game._process(1.0)
 	_expect(game.elapsed_time == elapsed_before_win_tick, "The timer must stop after a win.")
@@ -189,6 +194,7 @@ func _test_scene_lifecycle() -> void:
 	_expect(game.state == GameController.FieldState.READY, "The restart button must restart only the current field.")
 	await create_timer(1.3).timeout
 	_expect(game.score_feedback.overlay.get_child_count() == 0, "Score feedback nodes must not survive a reset.")
+	_expect(pattern_feedback.overlay.get_child_count() == 0, "Pattern feedback nodes must not survive a reset.")
 	game._show_abandon_confirmation()
 	_expect(game.abandon_overlay.visible, "Abandoning a run must require confirmation.")
 	game.cancel_abandon_button.pressed.emit()

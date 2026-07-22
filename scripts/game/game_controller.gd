@@ -10,6 +10,10 @@ const MAX_DISPLAY_TIME := 999
 @onready var start_run_button: Button = %StartRunButton
 @onready var board_view: BoardView = %BoardView
 @onready var score_feedback: ScoreFeedback = %ScoreFeedback
+@onready var pattern_feedback: PatternFeedback = %PatternFeedback
+@onready var pattern_score_label: Label = %PatternScoreLabel
+@onready var pattern_count_label: Label = %PatternCountLabel
+@onready var last_pattern_label: Label = %LastPatternLabel
 @onready var field_label: Label = %FieldLabel
 @onready var score_label: Label = %ScoreLabel
 @onready var target_label: Label = %TargetLabel
@@ -38,14 +42,23 @@ const MAX_DISPLAY_TIME := 999
 @onready var abandon_overlay: Control = %AbandonOverlay
 @onready var confirm_abandon_button: Button = %ConfirmAbandonButton
 @onready var cancel_abandon_button: Button = %CancelAbandonButton
+@onready var menu_patterns_button: Button = %MenuPatternsButton
+@onready var run_patterns_button: Button = %RunPatternsButton
+@onready var catalog_screen: Control = %CatalogScreen
+@onready var catalog_body: Label = %CatalogBody
+@onready var close_catalog_button: Button = %CloseCatalogButton
 
 var board: BoardModel
 var scoring := ScoreController.new()
+var patterns := PatternController.new()
 var run := RunController.new()
 var state := FieldState.READY
 var elapsed_time := 0.0
 var _displayed_second := -1
 var _last_field_result: FieldResult
+var _action_id := 0
+var _resolving_action := false
+var _catalog_open := false
 
 
 func _ready() -> void:
@@ -60,12 +73,17 @@ func _ready() -> void:
 	main_menu_button.pressed.connect(return_to_main_menu)
 	confirm_abandon_button.pressed.connect(return_to_main_menu)
 	cancel_abandon_button.pressed.connect(abandon_overlay.hide)
+	menu_patterns_button.pressed.connect(_show_pattern_catalog)
+	run_patterns_button.pressed.connect(_show_pattern_catalog)
+	close_catalog_button.pressed.connect(_close_pattern_catalog)
 	scoring.score_event_created.connect(_on_score_event_created)
 	scoring.metrics_changed.connect(_on_score_metrics_changed)
 	_show_main_menu()
 
 
 func _process(delta: float) -> void:
+	if _catalog_open:
+		return
 	if state != FieldState.PLAYING and state != FieldState.TARGET_REACHED:
 		return
 	elapsed_time += delta
@@ -76,6 +94,11 @@ func _process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _catalog_open:
+		if event.is_action_pressed("ui_cancel"):
+			_close_pattern_catalog()
+			get_viewport().set_input_as_handled()
+		return
 	if abandon_overlay.visible:
 		return
 	if start_screen.visible and event.is_action_pressed("ui_accept"):
@@ -88,6 +111,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func start_new_run() -> void:
+	_close_pattern_catalog()
 	run.start_run()
 	run_summary_screen.hide()
 	start_screen.hide()
@@ -121,10 +145,13 @@ func return_to_main_menu() -> void:
 	scoring.reset()
 	board_view.clear()
 	score_feedback.clear_feedback()
+	pattern_feedback.clear_feedback()
 	_show_main_menu()
 
 
 func _show_main_menu() -> void:
+	_catalog_open = false
+	catalog_screen.hide()
 	game_screen.hide()
 	run_summary_screen.hide()
 	abandon_overlay.hide()
@@ -139,11 +166,14 @@ func _load_current_field() -> void:
 	elapsed_time = 0.0
 	_displayed_second = 0
 	_last_field_result = null
+	_action_id = 0
 	board = BoardModel.new(config.width, config.height, config.mine_count)
 	scoring.reset()
+	patterns.reset_field()
 	board_view.build(config.width, config.height)
 	coordinates_label.text = "GRID %02d×%02d" % [config.width, config.height]
 	score_feedback.clear_feedback()
+	pattern_feedback.clear_feedback()
 	result_panel.hide()
 	shift_field_button.disabled = true
 	restart_field_button.disabled = false
@@ -154,58 +184,93 @@ func _load_current_field() -> void:
 	_update_hud()
 
 
-func _on_reveal_requested(position: Vector2i) -> void:
-	if not _field_accepts_input() or board.is_flagged(position):
+func _on_reveal_requested(cell_position: Vector2i) -> void:
+	if not _field_accepts_input() or board.is_flagged(cell_position):
 		return
-	if board.is_revealed(position):
-		_try_chord(position)
+	if board.is_revealed(cell_position):
+		_try_chord(cell_position)
 		return
-	if state == FieldState.READY:
-		board.place_mines(position)
+	var is_opening := state == FieldState.READY
+	if is_opening:
+		board.place_mines(cell_position)
 		state = FieldState.PLAYING
 
-	var clicked_adjacent := board.adjacent_mines(position)
-	var result: Dictionary = board.reveal(position)
+	var before_state: Dictionary = board.create_snapshot()
+	var clicked_adjacent := board.adjacent_mines(cell_position)
+	var result: Dictionary = board.reveal(cell_position)
 	var changed: Array[Vector2i] = result["changed"]
 	_refresh_changed_cells(changed)
-	var automatic_counts := _get_safe_adjacent_counts(changed, position)
-	scoring.record_manual_reveal(position, clicked_adjacent, automatic_counts, result["hit_mine"])
+	var automatic_counts := _get_safe_adjacent_counts(changed, cell_position)
+	_resolving_action = true
+	var score_event := scoring.record_manual_reveal(cell_position, clicked_adjacent, automatic_counts, result["hit_mine"])
+	var won: bool = not bool(result["hit_mine"]) and board.all_safe_cells_revealed()
+	var context := _make_reveal_context(
+		PatternActionContext.ActionType.MANUAL_REVEAL, cell_position, clicked_adjacent, changed,
+		[cell_position] if not result["hit_mine"] else [], before_state, is_opening, result["hit_mine"], won
+	)
+	_resolve_patterns(context, score_event)
+	_resolving_action = false
+	_on_score_metrics_changed()
 
 	if result["hit_mine"]:
-		_finish_loss(position)
-	elif board.all_safe_cells_revealed():
+		_finish_loss(cell_position)
+	elif won:
 		_confirm_current_field(true)
 	else:
 		_update_hud()
 
 
-func _try_chord(position: Vector2i) -> void:
+func _try_chord(cell_position: Vector2i) -> void:
 	if state != FieldState.PLAYING and state != FieldState.TARGET_REACHED:
 		return
-	var result: Dictionary = board.chord(position)
+	var before_state: Dictionary = board.create_snapshot()
+	var result: Dictionary = board.chord(cell_position)
 	if not result["performed"]:
 		return
 	var changed: Array[Vector2i] = result["changed"]
 	_refresh_changed_cells(changed)
 	var automatic_counts := _get_safe_adjacent_counts(changed)
-	scoring.record_chord(position, board.adjacent_mines(position), automatic_counts, result["hit_mine"])
+	_resolving_action = true
+	var score_event := scoring.record_chord(cell_position, board.adjacent_mines(cell_position), automatic_counts, result["hit_mine"])
+	var won: bool = not bool(result["hit_mine"]) and board.all_safe_cells_revealed()
+	var context := _make_reveal_context(
+		PatternActionContext.ActionType.CHORD, cell_position, board.adjacent_mines(cell_position), changed,
+		[], before_state, false, result["hit_mine"], won
+	)
+	_resolve_patterns(context, score_event)
+	_resolving_action = false
+	_on_score_metrics_changed()
 	if result["hit_mine"]:
 		_finish_loss(result["exploded_position"])
-	elif board.all_safe_cells_revealed():
+	elif won:
 		_confirm_current_field(true)
 	else:
 		_update_hud()
 
 
-func _on_flag_requested(position: Vector2i) -> void:
+func _on_flag_requested(cell_position: Vector2i) -> void:
 	if not _field_accepts_input():
 		return
-	if board.toggle_flag(position):
-		scoring.record_flag_action(board.is_flagged(position))
-		board_view.refresh_cell(board, position)
-		for neighbor in board.get_neighbors(position):
+	var before_state: Dictionary = board.create_snapshot()
+	if board.toggle_flag(cell_position):
+		var placed := board.is_flagged(cell_position)
+		_resolving_action = true
+		scoring.record_flag_action(placed)
+		board_view.refresh_cell(board, cell_position)
+		for neighbor in board.get_neighbors(cell_position):
 			if board.is_revealed(neighbor):
 				board_view.refresh_cell(board, neighbor)
+		_action_id += 1
+		var context := PatternActionContext.new()
+		context.action_id = _action_id
+		context.action_type = PatternActionContext.ActionType.FLAG_PLACED if placed else PatternActionContext.ActionType.FLAG_REMOVED
+		context.clicked_position = cell_position
+		context.before_state = before_state
+		context.after_state = board.create_snapshot()
+		context.safe_streak = scoring.safe_reveal_streak
+		_resolve_patterns(context, null)
+		_resolving_action = false
+		_on_score_metrics_changed()
 		_update_hud()
 
 
@@ -215,6 +280,8 @@ func _field_accepts_input() -> bool:
 
 func _on_score_metrics_changed() -> void:
 	if not is_node_ready() or run.state != RunController.RunState.IN_PROGRESS:
+		return
+	if _resolving_action:
 		return
 	if _field_accepts_input():
 		run.update_provisional_score(scoring.current_score)
@@ -229,6 +296,8 @@ func _confirm_current_field(full_clear: bool) -> void:
 	if state == FieldState.TRANSITIONING or state == FieldState.LOST:
 		return
 	var config := run.current_config()
+	score_feedback.clear_feedback()
+	pattern_feedback.clear_feedback()
 	var normal_score := scoring.current_score
 	var flag_counts := _count_flags()
 	state = FieldState.WON if full_clear else FieldState.TRANSITIONING
@@ -258,11 +327,18 @@ func _build_field_result(config: FieldConfig, normal_score: int, flag_counts: Ve
 	result.height = config.height
 	result.mine_count = config.mine_count
 	result.target_score = config.target_score
-	result.normal_field_score = normal_score
+	result.normal_field_score = normal_score - patterns.pattern_score
+	result.provisional_total_score = normal_score
 	result.manual_base_points = scoring.manual_base_points
 	result.streak_bonus_points = scoring.streak_bonus_points
 	result.cascade_cell_points = scoring.cascade_cell_points
-	result.cascade_bonus_points = scoring.cascade_bonus_points
+	result.pattern_score = patterns.pattern_score
+	result.pattern_count = patterns.total_patterns
+	result.best_pattern_name = patterns.best_pattern_name
+	result.best_pattern_points = patterns.best_pattern_points
+	result.pattern_activations = patterns.activations.duplicate(true)
+	result.pattern_best_metrics = patterns.best_metrics.duplicate(true)
+	result.highest_pattern_action_score = patterns.highest_action_pattern_score
 	result.flag_bonus_points = scoring.flag_bonus_points
 	result.clear_bonus_points = scoring.clear_bonus_points
 	result.accuracy_bonus_points = scoring.accuracy_bonus_points
@@ -283,6 +359,8 @@ func _build_field_result(config: FieldConfig, normal_score: int, flag_counts: Ve
 
 func _finish_loss(exploded_position: Vector2i) -> void:
 	state = FieldState.LOST
+	score_feedback.clear_feedback()
+	pattern_feedback.clear_feedback()
 	board_view.show_loss(board, exploded_position)
 	field_panel.add_theme_stylebox_override("panel", _make_outcome_style(Color("7a3040")))
 	run.lose_field(
@@ -292,7 +370,8 @@ func _finish_loss(exploded_position: Vector2i) -> void:
 		scoring.total_cells_revealed,
 		scoring.total_cascade_cells,
 		scoring.flag_placements,
-		scoring.highest_safe_reveal_streak
+		scoring.highest_safe_reveal_streak,
+		patterns.pattern_score
 	)
 	shift_field_button.disabled = true
 	restart_field_button.disabled = true
@@ -311,11 +390,13 @@ func _present_run_loss() -> void:
 func _show_field_transition(result: FieldResult) -> void:
 	result_title.text = "FIELD %d CLEARED" % result.field_number
 	result_title.modulate = Color("67e8a5")
-	result_body.text = """FIELD SCORE          %6d
+	result_body.text = """NORMAL SCORE         %6d
+PATTERN SCORE        %6d
+PATTERNS             %6d
+BEST PATTERN     %10s
 RISK REVEALS        %6d
 STREAK BONUS         %6d
-CASCADE CELLS        %6d
-CASCADE BONUS        %6d
+AUTO CELL SCORE      %6d
 FLAGS                %6d
 FIELD CLEAR          %6d
 EFFICIENCY           %6d
@@ -326,10 +407,12 @@ OVERSCORE            %6d
 FIELD CONFIRMED      %6d
 RUN SCORE            %6d""" % [
 		result.normal_field_score,
+		result.pattern_score,
+		result.pattern_count,
+		result.best_pattern_name,
 		result.manual_base_points,
 		result.streak_bonus_points,
 		result.cascade_cell_points,
-		result.cascade_bonus_points,
 		result.flag_bonus_points,
 		result.clear_bonus_points,
 		result.efficiency_bonus_points,
@@ -393,6 +476,12 @@ func _show_run_summary(won: bool) -> void:
 		run_summary_title.modulate = Color("67e8a5")
 		run_summary_body.text = """FINAL SCORE              %06d
 FIELDS COMPLETED          %02d
+PATTERN SCORE           %06d
+MOST ACTIVATED     %12s
+TOP PATTERN        %12s
+LARGEST CASCADE          %02d
+LARGEST CHAIN            %02d
+LONGEST SEQUENCE         %02d
 TOTAL TIME               %4d s
 TOTAL ACTIONS             %04d
 CELLS REVEALED            %04d
@@ -403,6 +492,12 @@ BEST FIELD SCORE        %06d
 AVERAGE OVERSCORE       %6.1f%%""" % [
 			run.confirmed_run_score,
 			stats.fields_completed,
+			stats.pattern_points,
+			stats.most_activated_pattern(),
+			stats.best_pattern_name,
+			int(stats.pattern_best_metrics.get("cascade", 0)),
+			int(stats.pattern_best_metrics.get("chain", 0)),
+			int(stats.pattern_best_metrics.get("sequence", 0)),
 			int(stats.total_time),
 			stats.total_actions,
 			stats.cells_revealed,
@@ -421,6 +516,8 @@ AVERAGE OVERSCORE       %6.1f%%""" % [
 		run_summary_body.text = """FIELD REACHED             %02d / %02d
 CONFIRMED SCORE          %06d
 PROVISIONAL LOST        %06d
+CONFIRMED PATTERNS      %06d
+LOST PATTERN SCORE     %06d
 FIELD TARGET            %06d
 TARGET PROGRESS         %6.1f%%
 TOTAL TIME               %4d s
@@ -433,6 +530,8 @@ FULL CLEARS               %02d""" % [
 			run.stages.size(),
 			run.confirmed_run_score,
 			stats.lost_provisional_score,
+			stats.pattern_points,
+			stats.lost_provisional_pattern_points,
 			config.target_score,
 			target_progress_percent,
 			int(stats.total_time),
@@ -455,16 +554,95 @@ func _show_abandon_confirmation() -> void:
 	cancel_abandon_button.grab_focus()
 
 
+func _show_pattern_catalog() -> void:
+	_catalog_open = true
+	score_feedback.clear_feedback()
+	pattern_feedback.clear_feedback()
+	var lines: Array[String] = []
+	for definition in patterns.definitions:
+		var confirmed_count := int(run.stats.pattern_activations.get(definition.id, 0))
+		var provisional_count := int(patterns.activations.get(definition.id, 0))
+		var best := maxi(
+			int(run.stats.pattern_best_metrics.get(definition.id, 0)),
+			int(patterns.best_metrics.get(definition.id, 0))
+		)
+		lines.append("%s  //  RUN %02d  //  BEST %02d" % [definition.display_name, confirmed_count + provisional_count, best])
+		lines.append(definition.description)
+		lines.append(definition.condition_text)
+		lines.append(definition.score_table)
+		lines.append("")
+	catalog_body.text = "\n".join(lines)
+	catalog_screen.show()
+	close_catalog_button.grab_focus()
+
+
+func _close_pattern_catalog() -> void:
+	_catalog_open = false
+	catalog_screen.hide()
+
+
 func _refresh_changed_cells(changed: Array[Vector2i]) -> void:
 	for changed_position in changed:
 		board_view.refresh_cell(board, changed_position)
 
 
+func _make_reveal_context(
+	action_type: PatternActionContext.ActionType,
+	cell_position: Vector2i,
+	clicked_value: int,
+	changed: Array[Vector2i],
+	manual_positions: Array,
+	before_state: Dictionary,
+	is_opening: bool,
+	hit_mine: bool,
+	won: bool
+) -> PatternActionContext:
+	_action_id += 1
+	var context := PatternActionContext.new()
+	context.action_id = _action_id
+	context.action_type = action_type
+	context.clicked_position = cell_position
+	context.clicked_value = clicked_value
+	context.before_state = before_state
+	context.after_state = board.create_snapshot()
+	context.safe_streak = scoring.safe_reveal_streak
+	context.relevant_adjacent_flags = board.count_adjacent_flags(cell_position)
+	context.caused_loss = hit_mine
+	context.caused_win = won
+	context.is_opening_action = is_opening
+	for manual_position: Vector2i in manual_positions:
+		context.manually_revealed.append(manual_position)
+	for changed_position in changed:
+		var is_manual := context.manually_revealed.has(changed_position)
+		context.revealed_cells.append({
+			"position": changed_position,
+			"value": board.adjacent_mines(changed_position),
+			"manual": is_manual,
+		})
+		if not is_manual:
+			context.automatically_revealed.append(changed_position)
+	context.finalize_counts()
+	return context
+
+
+func _resolve_patterns(context: PatternActionContext, score_event: ScoreEvent) -> void:
+	var results := patterns.detect(context)
+	if results.is_empty():
+		return
+	var points := patterns.total_points(results)
+	scoring.apply_pattern_points(points, score_event)
+	pattern_feedback.show_patterns(
+		board_view.global_position + Vector2(board_view.size.x + 18.0, 16.0),
+		board_view.get_cell_global_center(context.clicked_position),
+		results
+	)
+
+
 func _get_safe_adjacent_counts(changed: Array[Vector2i], excluded_position := Vector2i(-1, -1)) -> Array[int]:
 	var counts: Array[int] = []
-	for position in changed:
-		if position != excluded_position and not board.has_mine(position):
-			counts.append(board.adjacent_mines(position))
+	for cell_position in changed:
+		if cell_position != excluded_position and not board.has_mine(cell_position):
+			counts.append(board.adjacent_mines(cell_position))
 	return counts
 
 
@@ -473,10 +651,10 @@ func _count_flags() -> Vector2i:
 	var incorrect := 0
 	for y in board.height:
 		for x in board.width:
-			var position := Vector2i(x, y)
-			if not board.is_flagged(position):
+			var cell_position := Vector2i(x, y)
+			if not board.is_flagged(cell_position):
 				continue
-			if board.has_mine(position):
+			if board.has_mine(cell_position):
 				correct += 1
 			else:
 				incorrect += 1
@@ -493,7 +671,7 @@ func _update_hud() -> void:
 	var config := run.current_config()
 	var displayed_field_score := scoring.current_score
 	if state == FieldState.TRANSITIONING and _last_field_result != null:
-		displayed_field_score = _last_field_result.normal_field_score
+		displayed_field_score = _last_field_result.provisional_total_score
 	var displayed_provisional := displayed_field_score if _field_accepts_input() or state == FieldState.LOST else 0
 	field_label.text = "FIELD %d / %d" % [config.field_number, run.stages.size()]
 	score_label.text = "FIELD SCORE %06d" % displayed_field_score
@@ -502,6 +680,9 @@ func _update_hud() -> void:
 	multiplier_label.modulate = Color("67e8a5") if scoring.get_streak_multiplier() > 1.0 else Color("65738a")
 	actions_label.text = "ACTIONS %03d" % scoring.actions_taken
 	mines_label.text = "MINES %03d" % (config.mine_count - board.flags_placed)
+	pattern_score_label.text = "PATTERN SCORE %06d" % patterns.pattern_score
+	pattern_count_label.text = "PATTERNS %02d" % patterns.total_patterns
+	last_pattern_label.text = "LAST %s" % patterns.last_pattern
 	run_score_label.text = "RUN SCORE %06d + %06d" % [run.confirmed_run_score, displayed_provisional]
 	_update_target_hud(config, displayed_field_score)
 	_update_time_label()

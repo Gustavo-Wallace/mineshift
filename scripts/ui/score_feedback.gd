@@ -3,7 +3,6 @@ extends CanvasLayer
 
 const SCORE_COLOR := Color("dff8ff")
 const MULTIPLIER_COLOR := Color("67e8a5")
-const CASCADE_COLOR := Color("65ddff")
 
 @onready var overlay: Control = %FeedbackOverlay
 
@@ -15,12 +14,6 @@ func show_score_feedback(screen_position: Vector2, event: ScoreEvent) -> void:
 	if event.streak_multiplier > 1.0 and not event.is_chord:
 		score_label.modulate = MULTIPLIER_COLOR
 	_place_and_animate(score_label, screen_position - Vector2(32.0, 24.0), Vector2(0.0, -34.0), 0.85)
-
-	if not event.cascade_message.is_empty():
-		var cascade_text := "%s  +%d" % [event.cascade_message, event.cascade_size_bonus]
-		var cascade_label := _make_label(cascade_text, 13, CASCADE_COLOR)
-		_place_and_animate(cascade_label, screen_position + Vector2(-72.0, 4.0), Vector2(0.0, -22.0), 1.15)
-
 
 func clear_feedback() -> void:
 	for child in overlay.get_children():

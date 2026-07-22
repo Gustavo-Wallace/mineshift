@@ -180,6 +180,17 @@ func count_adjacent_flags(position: Vector2i) -> int:
 	return count
 
 
+func create_snapshot() -> Dictionary:
+	return {
+		"width": width,
+		"height": height,
+		"mines": _mines.duplicate(),
+		"revealed": _revealed.duplicate(),
+		"flagged": _flagged.duplicate(),
+		"adjacent": _adjacent_counts.duplicate(),
+	}
+
+
 func can_chord(position: Vector2i) -> bool:
 	if not is_valid_position(position) or not is_revealed(position) or adjacent_mines(position) == 0:
 		return false

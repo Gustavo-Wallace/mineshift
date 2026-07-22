@@ -22,7 +22,6 @@ var manual_base_points := 0
 var streak_bonus_points := 0
 var manual_reveal_points := 0
 var cascade_cell_points := 0
-var cascade_bonus_points := 0
 var flag_bonus_points := 0
 var clear_bonus_points := 0
 var accuracy_bonus_points := 0
@@ -43,7 +42,6 @@ func reset() -> void:
 	streak_bonus_points = 0
 	manual_reveal_points = 0
 	cascade_cell_points = 0
-	cascade_bonus_points = 0
 	flag_bonus_points = 0
 	clear_bonus_points = 0
 	accuracy_bonus_points = 0
@@ -132,6 +130,15 @@ func apply_shift_bonuses(correct_flags: int, incorrect_flags: int) -> void:
 	metrics_changed.emit()
 
 
+func apply_pattern_points(points: int, event: ScoreEvent = null) -> void:
+	if points <= 0:
+		return
+	if event != null:
+		event.pattern_score += points
+	current_score += points
+	metrics_changed.emit()
+
+
 func get_manual_reveal_score(adjacent_mines: int) -> int:
 	assert(adjacent_mines >= 0 and adjacent_mines < MANUAL_REVEAL_SCORES.size())
 	return MANUAL_REVEAL_SCORES[adjacent_mines]
@@ -147,18 +154,6 @@ func get_streak_multiplier() -> float:
 	if safe_reveal_streak >= 3:
 		return 1.15
 	return 1.0
-
-
-func get_cascade_size_bonus(cell_count: int) -> int:
-	if cell_count >= 25:
-		return 175
-	if cell_count >= 15:
-		return 90
-	if cell_count >= 8:
-		return 40
-	if cell_count >= 4:
-		return 15
-	return 0
 
 
 func get_accuracy_bonus(incorrect_flags: int) -> int:
@@ -193,11 +188,8 @@ func _make_event(
 	event.is_chord = is_chord
 	for adjacent_count in automatic_adjacent_counts:
 		event.cascade_cell_score += CASCADE_BASE_SCORE + adjacent_count * CASCADE_RISK_SCORE
-	event.cascade_size_bonus = get_cascade_size_bonus(event.automatic_cells)
-	event.cascade_message = _get_cascade_message(event.automatic_cells)
-	event.total_score = event.cascade_cell_score + event.cascade_size_bonus
+	event.total_score = event.cascade_cell_score
 	cascade_cell_points += event.cascade_cell_score
-	cascade_bonus_points += event.cascade_size_bonus
 	total_cascade_cells += event.automatic_cells
 	return event
 
@@ -207,13 +199,3 @@ func _commit_event(event: ScoreEvent) -> void:
 	event_history.append(event)
 	score_event_created.emit(event)
 	metrics_changed.emit()
-
-
-func _get_cascade_message(cell_count: int) -> String:
-	if cell_count >= 25:
-		return "MASSIVE CASCADE"
-	if cell_count >= 15:
-		return "LARGE CASCADE"
-	if cell_count >= 8:
-		return "CASCADE"
-	return ""

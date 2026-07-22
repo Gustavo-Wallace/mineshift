@@ -2,7 +2,7 @@
 
 Mineshift is a minesweeper roguelike about patterns, risk and rule manipulation.
 
-Built with Godot 4.7 and GDScript. The current prototype features five-field runs with progressive targets and difficulty, provisional field scoring, risk-based reveals, rewarded cascades, safe streaks, chord opening, and detailed run reports. Reach the target to shift safely, or keep sweeping for a higher score at the risk of losing the field's provisional points.
+Built with Godot 4.7 and GDScript. The current prototype features five-field runs, progressive targets, provisional scoring, safe streaks, and a pattern system that rewards CHAIN, MATCH, SEQUENCE, SURROUND, HIGH RISK, and CASCADE combinations. An in-game catalog explains every pattern while detailed field and run reports track the results.
 
 ## Controls
 
