@@ -10,11 +10,11 @@ const NUMBER_COLORS: Array[Color] = [
 	Color("62c6ff"),
 	Color("67e8a5"),
 	Color("ffca5c"),
-	Color("ad8cff"),
+	Color("ff9f55"),
 	Color("ff7185"),
-	Color("54dfda"),
-	Color("f0a3ff"),
-	Color("d7dce8"),
+	Color("ff4f61"),
+	Color("f06dff"),
+	Color("fff0f3"),
 ]
 
 var board_position := Vector2i.ZERO
@@ -25,6 +25,7 @@ var adjacent_count := 0
 var exploded := false
 var wrong_flag := false
 var locked := false
+var can_chord := false
 
 var _hovered := false
 var _pressed := false
@@ -49,7 +50,8 @@ func set_visual_state(
 	nearby_mines: int,
 	is_exploded: bool = false,
 	is_wrong_flag: bool = false,
-	is_locked: bool = false
+	is_locked: bool = false,
+	is_chord_available: bool = false
 ) -> void:
 	revealed = is_revealed
 	flagged = is_flagged
@@ -58,6 +60,7 @@ func set_visual_state(
 	exploded = is_exploded
 	wrong_flag = is_wrong_flag
 	locked = is_locked
+	can_chord = is_chord_available
 	mouse_default_cursor_shape = Control.CURSOR_ARROW if locked else Control.CURSOR_POINTING_HAND
 	queue_redraw()
 
@@ -114,6 +117,8 @@ func _draw() -> void:
 
 	if has_focus() and not locked:
 		draw_rect(rect.grow(-2.0), Color("a5efff"), false, 1.5)
+	elif can_chord and _hovered and not locked:
+		draw_rect(rect.grow(-2.0), Color("67e8a5"), false, 2.0)
 
 
 func _draw_closed(rect: Rect2) -> void:

@@ -108,6 +108,32 @@ func reveal(position: Vector2i) -> Dictionary:
 	return {"changed": changed, "hit_mine": false}
 
 
+func chord(position: Vector2i) -> Dictionary:
+	var changed: Array[Vector2i] = []
+	var exploded_position := Vector2i(-1, -1)
+	if not can_chord(position):
+		return {"changed": changed, "hit_mine": false, "exploded_position": exploded_position, "performed": false}
+
+	for neighbor in get_neighbors(position):
+		if is_revealed(neighbor) or is_flagged(neighbor):
+			continue
+		if has_mine(neighbor):
+			_set_revealed(neighbor, changed)
+			if exploded_position.x < 0:
+				exploded_position = neighbor
+			continue
+		var result: Dictionary = reveal(neighbor)
+		var neighbor_changes: Array[Vector2i] = result["changed"]
+		changed.append_array(neighbor_changes)
+
+	return {
+		"changed": changed,
+		"hit_mine": exploded_position.x >= 0,
+		"exploded_position": exploded_position,
+		"performed": true,
+	}
+
+
 func toggle_flag(position: Vector2i) -> bool:
 	if not is_valid_position(position) or is_revealed(position):
 		return false
@@ -144,6 +170,25 @@ func adjacent_mines(position: Vector2i) -> int:
 	if not is_valid_position(position):
 		return 0
 	return _adjacent_counts[_index(position)]
+
+
+func count_adjacent_flags(position: Vector2i) -> int:
+	var count := 0
+	for neighbor in get_neighbors(position):
+		if is_flagged(neighbor):
+			count += 1
+	return count
+
+
+func can_chord(position: Vector2i) -> bool:
+	if not is_valid_position(position) or not is_revealed(position) or adjacent_mines(position) == 0:
+		return false
+	if count_adjacent_flags(position) != adjacent_mines(position):
+		return false
+	for neighbor in get_neighbors(position):
+		if not is_revealed(neighbor) and not is_flagged(neighbor):
+			return true
+	return false
 
 
 func get_neighbors(position: Vector2i) -> Array[Vector2i]:

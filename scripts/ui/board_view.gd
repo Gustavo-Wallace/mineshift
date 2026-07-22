@@ -44,8 +44,16 @@ func refresh_cell(model: BoardModel, position: Vector2i, locked: bool = false) -
 		model.adjacent_mines(position),
 		false,
 		false,
-		locked
+		locked,
+		model.can_chord(position)
 	)
+
+
+func get_cell_global_center(position: Vector2i) -> Vector2:
+	var cell := _get_cell(position)
+	if cell == null:
+		return global_position
+	return cell.global_position + cell.size * 0.5
 
 
 func show_loss(model: BoardModel, exploded_position: Vector2i) -> void:

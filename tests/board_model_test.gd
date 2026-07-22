@@ -139,6 +139,9 @@ func _test_scene_lifecycle() -> void:
 	game._on_reveal_requested(exploded_position)
 	_expect(game.state == GameController.GameState.LOST, "Revealing a mine must enter LOST.")
 	_expect(game.state_label.text == "FIELD BREACHED", "A loss must be clearly labeled.")
+	_expect(game.result_panel.visible, "A loss must display the result panel.")
+	_expect(game.result_body.text.contains("FIELD COMPLETE"), "The loss result must include completion percentage.")
+	_expect(game.scoring.safe_reveal_streak == 0, "A loss must reset the current safe streak.")
 	_expect(game.board_view._get_cell(exploded_position).exploded, "The triggered mine must have a distinct visual state.")
 	_expect(game.board_view._get_cell(known_safe_flag).wrong_flag, "A safe flagged cell must be identified as incorrect.")
 	game._process(1.0)
@@ -148,6 +151,7 @@ func _test_scene_lifecycle() -> void:
 		_expect(game.board_view.get_child_count() == BOARD_WIDTH * BOARD_HEIGHT, "Repeated resets must not duplicate cells.")
 		_expect(game.state == GameController.GameState.READY, "Every reset must return to READY.")
 		_expect(game.elapsed_time == 0.0, "Every reset must clear the timer.")
+		_expect(game.scoring.current_score == 0 and game.scoring.actions_taken == 0, "Every reset must clear scoring and actions.")
 
 	game._on_reveal_requested(Vector2i(4, 4))
 	for y in BOARD_HEIGHT:
@@ -157,6 +161,8 @@ func _test_scene_lifecycle() -> void:
 				game._on_reveal_requested(position)
 	_expect(game.state == GameController.GameState.WON, "Revealing all safe cells must enter WON.")
 	_expect(game.state_label.text == "FIELD CLEARED", "A win must be clearly labeled.")
+	_expect(game.result_panel.visible, "A win must display the result panel.")
+	_expect(game.result_body.text.contains("CASCADE BONUS") and game.result_body.text.contains("EFFICIENCY"), "The win result must itemize completion bonuses.")
 	var elapsed_before_win_tick := game.elapsed_time
 	game._process(1.0)
 	_expect(game.elapsed_time == elapsed_before_win_tick, "The timer must stop after a win.")
@@ -169,6 +175,8 @@ func _test_scene_lifecycle() -> void:
 	game._on_reveal_requested(Vector2i(4, 4))
 	game.new_field_button.pressed.emit()
 	_expect(game.state == GameController.GameState.READY, "The NEW FIELD button must start a new field.")
+	await create_timer(1.3).timeout
+	_expect(game.score_feedback.overlay.get_child_count() == 0, "Score feedback nodes must not survive a reset.")
 	game.queue_free()
 	await process_frame
 
