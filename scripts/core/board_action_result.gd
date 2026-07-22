@@ -28,6 +28,17 @@ func all_changed_positions() -> Array[Vector2i]:
 	return combined
 
 
+func merge_from(other: BoardActionResult) -> void:
+	if other == null:
+		return
+	performed = performed or other.performed
+	_append_unique(safe_revealed, other.safe_revealed)
+	_append_unique(detonated_mines, other.detonated_mines)
+	_append_unique(neutralized_mines, other.neutralized_mines)
+	_append_unique(recalculated_positions, other.recalculated_positions)
+	_append_unique(expansion_revealed, other.expansion_revealed)
+
+
 func _append_unique(target: Array[Vector2i], source: Array[Vector2i]) -> void:
 	for cell_position in source:
 		if not target.has(cell_position):

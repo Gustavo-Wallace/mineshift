@@ -20,6 +20,7 @@ const NUMBER_COLORS: Array[Color] = [
 var board_position := Vector2i.ZERO
 var revealed := false
 var flagged := false
+var verified_flag := false
 var contains_mine := false
 var neutralized := false
 var adjacent_count := 0
@@ -54,6 +55,7 @@ func set_cell_size(cell_size: float) -> void:
 func set_visual_state(
 	is_revealed: bool,
 	is_flagged: bool,
+	is_verified_flag: bool,
 	has_mine: bool,
 	nearby_mines: int,
 	is_neutralized: bool = false,
@@ -65,6 +67,7 @@ func set_visual_state(
 ) -> void:
 	revealed = is_revealed
 	flagged = is_flagged
+	verified_flag = is_verified_flag
 	contains_mine = has_mine
 	neutralized = is_neutralized
 	adjacent_count = nearby_mines
@@ -129,7 +132,9 @@ func _draw() -> void:
 	elif neutralized:
 		_draw_neutralized_mine(rect)
 	elif flagged:
-		_draw_flag(rect, Color("67e8a5") if resolved else Color("65ddff"))
+		_draw_flag(rect, Color("67e8a5") if resolved or verified_flag else Color("65ddff"))
+		if verified_flag:
+			_draw_verified_seal(rect)
 	elif contains_mine and locked:
 		_draw_mine(rect)
 
@@ -224,3 +229,16 @@ func _draw_wrong_flag(rect: Rect2) -> void:
 	var center := rect.get_center()
 	draw_line(center - Vector2(12, 12), center + Vector2(12, 12), Color("ff7185"), 2.5)
 	draw_line(center + Vector2(-12, 12), center + Vector2(12, -12), Color("ff7185"), 2.5)
+
+
+func _draw_verified_seal(rect: Rect2) -> void:
+	var center := rect.get_center()
+	var radius := minf(size.x, size.y) * 0.34
+	var diamond := PackedVector2Array([
+		center + Vector2(0, -radius),
+		center + Vector2(radius, 0),
+		center + Vector2(0, radius),
+		center + Vector2(-radius, 0),
+		center + Vector2(0, -radius),
+	])
+	draw_polyline(diamond, Color("67e8a5"), 2.0)

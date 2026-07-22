@@ -37,21 +37,22 @@ func start_run() -> FieldConfig:
 	return current_config()
 
 
-func can_restart_field() -> bool:
-	return state == RunState.IN_PROGRESS and current_integrity > config.restart_integrity_cost
+func can_restart_attempt(waive_cost: bool = false) -> bool:
+	return state == RunState.IN_PROGRESS and (waive_cost or current_integrity > config.restart_integrity_cost)
 
 
-func restart_current_field(discarded_time: float = 0.0) -> FieldConfig:
-	if not can_restart_field():
+func restart_field_attempt(discarded_time: float = 0.0, waive_cost: bool = false) -> FieldConfig:
+	if not can_restart_attempt(waive_cost):
 		return null
-	current_integrity -= config.restart_integrity_cost
-	stats.damage_taken += config.restart_integrity_cost
-	stats.paid_restarts += 1
+	if not waive_cost:
+		current_integrity -= config.restart_integrity_cost
+		stats.damage_taken += config.restart_integrity_cost
+		stats.paid_restarts += 1
+		current_field_damage += config.restart_integrity_cost
+		current_field_paid_restarts += 1
 	stats.restarts += 1
 	stats.fields_started += 1
 	stats.total_time += maxf(0.0, discarded_time)
-	current_field_damage += config.restart_integrity_cost
-	current_field_paid_restarts += 1
 	current_field_neutralized = 0
 	integrity_changed.emit(current_integrity, config.max_integrity)
 	field_restart_confirmed.emit()

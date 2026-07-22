@@ -24,6 +24,7 @@ var _mines: PackedByteArray
 var _neutralized: PackedByteArray
 var _revealed: PackedByteArray
 var _flagged: PackedByteArray
+var _verified_flags: PackedByteArray
 var _adjacent_counts: PackedByteArray
 
 
@@ -49,27 +50,31 @@ func reset(board_width: int, board_height: int, total_mines: int) -> void:
 	_revealed.resize(cell_count)
 	_flagged = PackedByteArray()
 	_flagged.resize(cell_count)
+	_verified_flags = PackedByteArray()
+	_verified_flags.resize(cell_count)
 	_adjacent_counts = PackedByteArray()
 	_adjacent_counts.resize(cell_count)
 
 
-func place_mines(first_position: Vector2i) -> void:
+func generate_mines(first_position: Vector2i, requested_protection_radius: int = 1) -> void:
 	if mines_are_placed:
 		return
 	assert(is_valid_position(first_position))
 
+	var protection_radius := maxi(0, requested_protection_radius)
 	var protected := PackedByteArray()
-	protected.resize(width * height)
-	protected[_index(first_position)] = 1
-	for neighbor in get_neighbors(first_position):
-		protected[_index(neighbor)] = 1
-
 	var candidates: Array[Vector2i] = []
-	for y in height:
-		for x in width:
-			var position := Vector2i(x, y)
-			if protected[_index(position)] == 0:
-				candidates.append(position)
+	while true:
+		protected = _build_protected_region(first_position, protection_radius)
+		candidates.clear()
+		for y in height:
+			for x in width:
+				var cell_position := Vector2i(x, y)
+				if protected[_index(cell_position)] == 0:
+					candidates.append(cell_position)
+		if candidates.size() >= mine_count or protection_radius == 0:
+			break
+		protection_radius -= 1
 
 	assert(mine_count <= candidates.size(), "Too many mines for the protected opening area.")
 	candidates.shuffle()
@@ -79,6 +84,17 @@ func place_mines(first_position: Vector2i) -> void:
 	_calculate_adjacent_counts()
 	mines_are_placed = true
 	mines_placed.emit()
+
+
+func _build_protected_region(center: Vector2i, radius: int) -> PackedByteArray:
+	var protected := PackedByteArray()
+	protected.resize(width * height)
+	for offset_y in range(-radius, radius + 1):
+		for offset_x in range(-radius, radius + 1):
+			var cell_position := center + Vector2i(offset_x, offset_y)
+			if is_valid_position(cell_position):
+				protected[_index(cell_position)] = 1
+	return protected
 
 
 func perform_reveal_action(position: Vector2i) -> BoardActionResult:
@@ -146,6 +162,11 @@ func neutralize_detonations(action: BoardActionResult) -> void:
 		if not has_mine(mine_position):
 			continue
 		var mine_index := _index(mine_position)
+		if _flagged[mine_index] == 1:
+			_flagged[mine_index] = 0
+			_verified_flags[mine_index] = 0
+			flags_placed -= 1
+			flag_changed.emit(mine_position, false)
 		_mines[mine_index] = 0
 		_neutralized[mine_index] = 1
 		action.neutralized_mines.append(mine_position)
@@ -168,6 +189,22 @@ func neutralize_detonations(action: BoardActionResult) -> void:
 		mines_neutralized.emit(action.neutralized_mines)
 	if not action.recalculated_positions.is_empty():
 		board_numbers_recalculated.emit(action.recalculated_positions)
+
+
+func reveal_orthogonal_safe_cells(origins: Array[Vector2i]) -> Array[Vector2i]:
+	var changed: Array[Vector2i] = []
+	var orthogonal_offsets: Array[Vector2i] = [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]
+	for origin in origins:
+		for offset in orthogonal_offsets:
+			var cell_position := origin + offset
+			if not is_valid_position(cell_position) or is_revealed(cell_position) or is_flagged(cell_position) or has_mine(cell_position) or is_neutralized(cell_position):
+				continue
+			var local_changes: Array[Vector2i] = []
+			_reveal_safe_area(cell_position, local_changes)
+			for revealed_position in local_changes:
+				if not changed.has(revealed_position):
+					changed.append(revealed_position)
+	return changed
 
 
 func _expand_recalculated_zeros(seeds: Array[Vector2i], changed: Array[Vector2i]) -> void:
@@ -198,6 +235,8 @@ func toggle_flag(position: Vector2i) -> bool:
 		return false
 	var index := _index(position)
 	if _flagged[index] == 1:
+		if _verified_flags[index] == 1:
+			return false
 		_flagged[index] = 0
 		flags_placed -= 1
 	else:
@@ -206,6 +245,24 @@ func toggle_flag(position: Vector2i) -> bool:
 		_flagged[index] = 1
 		flags_placed += 1
 	flag_changed.emit(position, _flagged[index] == 1)
+	return true
+
+
+func mark_flag_verified(position: Vector2i) -> bool:
+	if not is_valid_position(position) or not is_flagged(position) or not has_mine(position):
+		return false
+	_verified_flags[_index(position)] = 1
+	return true
+
+
+func remove_flag(position: Vector2i) -> bool:
+	if not is_valid_position(position) or not is_flagged(position):
+		return false
+	var cell_index := _index(position)
+	_flagged[cell_index] = 0
+	_verified_flags[cell_index] = 0
+	flags_placed -= 1
+	flag_changed.emit(position, false)
 	return true
 
 
@@ -240,6 +297,10 @@ func is_flagged(position: Vector2i) -> bool:
 	return is_valid_position(position) and _flagged[_index(position)] == 1
 
 
+func is_flag_verified(position: Vector2i) -> bool:
+	return is_valid_position(position) and _verified_flags[_index(position)] == 1
+
+
 func adjacent_mines(position: Vector2i) -> int:
 	if not is_valid_position(position):
 		return 0
@@ -262,6 +323,7 @@ func create_snapshot() -> Dictionary:
 		"neutralized": _neutralized.duplicate(),
 		"revealed": _revealed.duplicate(),
 		"flagged": _flagged.duplicate(),
+		"verified_flags": _verified_flags.duplicate(),
 		"adjacent": _adjacent_counts.duplicate(),
 	}
 

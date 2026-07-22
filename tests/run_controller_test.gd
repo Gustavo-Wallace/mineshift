@@ -75,14 +75,14 @@ func _test_paid_restart_accounting() -> void:
 	run.start_run()
 	var original_field := run.current_config()
 	run.record_neutralized(2)
-	_expect(run.can_restart_field(), "Three integrity must allow a paid restart.")
-	var restarted := run.restart_current_field(6.0)
+	_expect(run.can_restart_attempt(), "Three integrity must allow a paid restart.")
+	var restarted := run.restart_field_attempt(6.0)
 	_expect(restarted == original_field and run.current_integrity == 2, "A paid restart must preserve the field and charge one integrity.")
 	_expect(run.current_field_neutralized == 0 and run.stats.neutralized_mines == 0, "Neutralizations from a discarded board must not be confirmed.")
 	_expect(run.stats.paid_restarts == 1 and run.stats.damage_taken == 1 and is_equal_approx(run.stats.total_time, 6.0), "Paid restart statistics and discarded time must be recorded.")
-	run.restart_current_field()
-	_expect(run.current_integrity == 1 and not run.can_restart_field(), "One remaining integrity must disable restarts.")
-	_expect(run.restart_current_field() == null and run.current_integrity == 1, "A blocked restart must never consume integrity.")
+	run.restart_field_attempt()
+	_expect(run.current_integrity == 1 and not run.can_restart_attempt(), "One remaining integrity must disable restarts.")
+	_expect(run.restart_field_attempt() == null and run.current_integrity == 1, "A blocked restart must never consume integrity.")
 
 
 func _test_game_breach_flow() -> void:
@@ -160,8 +160,11 @@ func _test_multi_breach_and_complete_run() -> void:
 		_expect(game.state == GameController.FieldState.CLEARED, "Every field must still require all safe cells to be revealed.")
 		if field_number < 5:
 			_expect(game.field_result_screen.visible and _inside_viewport(game.next_field_button), "The compact integrity transition must fit in 1280×720.")
+			game.module_option_buttons[0].pressed.emit()
+			game.install_module_button.pressed.emit()
 			game.next_field_button.pressed.emit()
 	_expect(game.run.state == RunController.RunState.RUN_WON and game.run_summary_title.text == "RUN CLEARED", "Clearing Field 5 must preserve the normal run victory.")
+	_expect(game.modules.installed_count() == 4 and not game.field_result_screen.visible, "The run must end with four unique modules and no fifth-field choice.")
 	_expect(game.run_summary_body.text.contains("INTEGRITY  3 / 3") and _inside_viewport(game.retry_run_button), "The compact victory must show remaining integrity and visible actions.")
 	game.summary_menu_button.pressed.emit()
 	_expect(game.start_screen.visible and game.run.state == RunController.RunState.NOT_STARTED, "Main menu must clear the completed run.")
@@ -190,7 +193,7 @@ func _find_all_mines(board: BoardModel) -> Array[Vector2i]:
 func _find_incorrect_chord_setup() -> Dictionary:
 	for _attempt in 700:
 		var board := BoardModel.new(9, 9, 10)
-		board.place_mines(Vector2i(4, 4))
+		board.generate_mines(Vector2i(4, 4))
 		board.perform_reveal_action(Vector2i(4, 4))
 		for y in board.height:
 			for x in board.width:

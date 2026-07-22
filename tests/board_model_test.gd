@@ -29,7 +29,7 @@ func _test_generation_and_opening_safety() -> void:
 	for run_index in 150:
 		var board := BoardModel.new(BOARD_WIDTH, BOARD_HEIGHT, MINE_COUNT)
 		var first := Vector2i(run_index % BOARD_WIDTH, floori(run_index / float(BOARD_WIDTH)) % BOARD_HEIGHT)
-		board.place_mines(first)
+		board.generate_mines(first)
 		_expect(not board.has_mine(first), "The opening cell must always be safe.")
 		for neighbor in board.get_neighbors(first):
 			_expect(not board.has_mine(neighbor), "Every neighbor of the opening cell must be protected.")
@@ -53,7 +53,7 @@ func _test_flags_and_limit() -> void:
 		_expect(board.toggle_flag(Vector2i(index, 0)), "Flags below the mine limit must be accepted.")
 	_expect(not board.toggle_flag(Vector2i(3, 0)), "Flags must be capped by active mines.")
 	_expect(board.toggle_flag(Vector2i(1, 0)) and board.flags_placed == 2, "Removing a flag must always remain possible.")
-	board.place_mines(Vector2i(2, 2))
+	board.generate_mines(Vector2i(2, 2))
 	var opening: BoardActionResult = board.perform_reveal_action(Vector2i(2, 2))
 	if not opening.safe_revealed.is_empty():
 		_expect(not board.toggle_flag(opening.safe_revealed[0]), "Revealed cells cannot be flagged.")
@@ -61,7 +61,7 @@ func _test_flags_and_limit() -> void:
 
 func _test_empty_region() -> void:
 	var board := BoardModel.new(9, 9, 10)
-	board.place_mines(Vector2i(4, 4))
+	board.generate_mines(Vector2i(4, 4))
 	var opening: BoardActionResult = board.perform_reveal_action(Vector2i(4, 4))
 	_expect(not opening.has_breach() and not opening.safe_revealed.is_empty(), "A safe opening must reveal a region without damage.")
 
@@ -167,6 +167,7 @@ func _test_scene_field_and_paid_restart() -> void:
 	_clear_all_safe(game)
 	await process_frame
 	_expect(game.state == GameController.FieldState.CLEARED and game.field_result_body.text.contains("INTEGRITY  3 / 3"), "A clean field must preserve integrity in the compact result.")
+	_install_non_cache_offer(game)
 	game.next_field_button.pressed.emit()
 	_expect(game.run.current_integrity == 3 and game.run.current_config().field_number == 2, "Integrity must persist between fields.")
 
@@ -187,7 +188,7 @@ func _test_scene_field_and_paid_restart() -> void:
 
 	game._show_restart_confirmation()
 	game.confirm_action_button.pressed.emit()
-	_expect(game.run.current_integrity == 1 and not game.run.can_restart_field(), "A second paid restart must leave one integrity and disable further restarts.")
+	_expect(game.run.current_integrity == 1 and not game.run.can_restart_attempt(), "A second paid restart must leave one integrity and disable further restarts.")
 	game._show_restart_confirmation()
 	_expect(game.confirm_copy.text.contains("INSUFFICIENT INTEGRITY") and game.confirm_action_button.disabled, "Restart confirmation must clearly reject one remaining integrity.")
 	game.cancel_confirm_button.pressed.emit()
@@ -203,10 +204,18 @@ func _clear_all_safe(game: GameController) -> void:
 				game._on_reveal_requested(cell_position)
 
 
+func _install_non_cache_offer(game: GameController) -> void:
+	for option_index in game.modules.current_offers.size():
+		if game.modules.current_offers[option_index].id != ModuleController.RESTART_CACHE:
+			game.module_option_buttons[option_index].pressed.emit()
+			game.install_module_button.pressed.emit()
+			return
+
+
 func _find_correct_chord_setup() -> Dictionary:
 	for _attempt in 300:
 		var board := BoardModel.new(9, 9, 10)
-		board.place_mines(Vector2i(4, 4))
+		board.generate_mines(Vector2i(4, 4))
 		board.perform_reveal_action(Vector2i(4, 4))
 		for y in board.height:
 			for x in board.width:
@@ -228,7 +237,7 @@ func _find_correct_chord_setup() -> Dictionary:
 func _find_incorrect_chord_setup() -> Dictionary:
 	for _attempt in 600:
 		var board := BoardModel.new(9, 9, 10)
-		board.place_mines(Vector2i(4, 4))
+		board.generate_mines(Vector2i(4, 4))
 		board.perform_reveal_action(Vector2i(4, 4))
 		for y in board.height:
 			for x in board.width:
@@ -256,7 +265,7 @@ func _find_incorrect_chord_setup() -> Dictionary:
 func _find_recalculation_setup(require_zero: bool) -> Dictionary:
 	for _attempt in 800:
 		var board := BoardModel.new(9, 9, 10)
-		board.place_mines(Vector2i(4, 4))
+		board.generate_mines(Vector2i(4, 4))
 		board.perform_reveal_action(Vector2i(4, 4))
 		for mine_position in _find_all_mines(board):
 			for neighbor in board.get_neighbors(mine_position):

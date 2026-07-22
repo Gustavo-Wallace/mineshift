@@ -134,6 +134,55 @@ unique_name_in_owner = true
 layout_mode = 2
 text = "ABANDON"
 
+[node name="ModuleBar" type="HBoxContainer" parent="GameScreen/GameMargin/GameLayout" unique_id=249015879]
+custom_minimum_size = Vector2(0, 30)
+layout_mode = 2
+theme_override_constants/separation = 8
+alignment = 1
+
+[node name="ModulesButton" type="Button" parent="GameScreen/GameMargin/GameLayout/ModuleBar" unique_id=1178936893]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(92, 28)
+layout_mode = 2
+text = "MODULES"
+
+[node name="ModuleSlot1" type="Label" parent="GameScreen/GameMargin/GameLayout/ModuleBar" unique_id=1571350683]
+unique_name_in_owner = true
+visible = false
+custom_minimum_size = Vector2(118, 28)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.396, 0.867, 1, 1)
+text = "◇ BUFFER"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ModuleSlot2" type="Label" parent="GameScreen/GameMargin/GameLayout/ModuleBar" unique_id=728993303]
+unique_name_in_owner = true
+visible = false
+custom_minimum_size = Vector2(118, 28)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.396, 0.867, 1, 1)
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ModuleSlot3" type="Label" parent="GameScreen/GameMargin/GameLayout/ModuleBar" unique_id=762807904]
+unique_name_in_owner = true
+visible = false
+custom_minimum_size = Vector2(118, 28)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.396, 0.867, 1, 1)
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ModuleSlot4" type="Label" parent="GameScreen/GameMargin/GameLayout/ModuleBar" unique_id=1505961739]
+unique_name_in_owner = true
+visible = false
+custom_minimum_size = Vector2(118, 28)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.396, 0.867, 1, 1)
+horizontal_alignment = 1
+vertical_alignment = 1
+
 [node name="MainArea" type="CenterContainer" parent="GameScreen/GameMargin/GameLayout" unique_id=185322773]
 layout_mode = 2
 size_flags_vertical = 3
@@ -266,7 +315,7 @@ grow_horizontal = 2
 grow_vertical = 2
 
 [node name="Panel" type="PanelContainer" parent="FieldResultScreen/Center" unique_id=1170840382]
-custom_minimum_size = Vector2(440, 300)
+custom_minimum_size = Vector2(980, 550)
 layout_mode = 2
 
 [node name="Margin" type="MarginContainer" parent="FieldResultScreen/Center/Panel" unique_id=412552473]
@@ -278,7 +327,7 @@ theme_override_constants/margin_bottom = 30
 
 [node name="Layout" type="VBoxContainer" parent="FieldResultScreen/Center/Panel/Margin" unique_id=484741210]
 layout_mode = 2
-theme_override_constants/separation = 18
+theme_override_constants/separation = 12
 
 [node name="FieldResultTitle" type="Label" parent="FieldResultScreen/Center/Panel/Margin/Layout" unique_id=519038950]
 unique_name_in_owner = true
@@ -291,7 +340,7 @@ horizontal_alignment = 1
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
-theme_override_font_sizes/font_size = 17
+theme_override_font_sizes/font_size = 16
 text = "TIME  0:00
 MINES  10
 
@@ -299,10 +348,73 @@ NEXT  9×9 · 12 MINES"
 horizontal_alignment = 1
 vertical_alignment = 1
 
+[node name="ModulePromptLabel" type="Label" parent="FieldResultScreen/Center/Panel/Margin/Layout" unique_id=1301856609]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.396, 0.867, 1, 1)
+theme_override_font_sizes/font_size = 18
+text = "INSTALL ONE MODULE"
+horizontal_alignment = 1
+
+[node name="ModuleChoiceGrid" type="GridContainer" parent="FieldResultScreen/Center/Panel/Margin/Layout" unique_id=674622955]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/h_separation = 12
+theme_override_constants/v_separation = 8
+columns = 3
+
+[node name="ModuleOption1" type="Button" parent="FieldResultScreen/Center/Panel/Margin/Layout/ModuleChoiceGrid" unique_id=1016223989]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(292, 132)
+layout_mode = 2
+text = "◇  BUFFER LAYER
+DEFENSE
+The first breach in each field deals no Integrity damage."
+autowrap_mode = 2
+
+[node name="ModuleOption2" type="Button" parent="FieldResultScreen/Center/Panel/Margin/Layout/ModuleChoiceGrid" unique_id=1784874207]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(292, 132)
+layout_mode = 2
+autowrap_mode = 2
+
+[node name="ModuleOption3" type="Button" parent="FieldResultScreen/Center/Panel/Margin/Layout/ModuleChoiceGrid" unique_id=1572760590]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(292, 132)
+layout_mode = 2
+autowrap_mode = 2
+
+[node name="ModuleConfirmRow" type="HBoxContainer" parent="FieldResultScreen/Center/Panel/Margin/Layout" unique_id=484976598]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="SelectedModuleLabel" type="Label" parent="FieldResultScreen/Center/Panel/Margin/Layout/ModuleConfirmRow" unique_id=583463412]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "INSTALL BUFFER LAYER?"
+vertical_alignment = 1
+
+[node name="InstallModuleButton" type="Button" parent="FieldResultScreen/Center/Panel/Margin/Layout/ModuleConfirmRow" unique_id=56694058]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(120, 44)
+layout_mode = 2
+text = "INSTALL"
+
+[node name="BackModuleButton" type="Button" parent="FieldResultScreen/Center/Panel/Margin/Layout/ModuleConfirmRow" unique_id=1806061899]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(100, 44)
+layout_mode = 2
+text = "BACK"
+
 [node name="NextFieldButton" type="Button" parent="FieldResultScreen/Center/Panel/Margin/Layout" unique_id=1040044258]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 48)
 layout_mode = 2
+disabled = true
 text = "ENTER FIELD 2"
 
 [node name="RunSummaryScreen" type="Control" parent="." unique_id=1859908929]
@@ -526,3 +638,67 @@ unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 text = "CANCEL"
+
+[node name="ModulesScreen" type="Control" parent="." unique_id=1885396246]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Shade" type="ColorRect" parent="ModulesScreen" unique_id=2026847780]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.015, 0.027, 0.047, 0.94)
+
+[node name="Center" type="CenterContainer" parent="ModulesScreen" unique_id=2063917494]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Panel" type="PanelContainer" parent="ModulesScreen/Center" unique_id=838104208]
+custom_minimum_size = Vector2(700, 530)
+layout_mode = 2
+
+[node name="Margin" type="MarginContainer" parent="ModulesScreen/Center/Panel" unique_id=1826698235]
+layout_mode = 2
+theme_override_constants/margin_left = 36
+theme_override_constants/margin_top = 28
+theme_override_constants/margin_right = 36
+theme_override_constants/margin_bottom = 28
+
+[node name="Layout" type="VBoxContainer" parent="ModulesScreen/Center/Panel/Margin" unique_id=2092811050]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="Title" type="Label" parent="ModulesScreen/Center/Panel/Margin/Layout" unique_id=1945151301]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.396, 0.867, 1, 1)
+theme_override_font_sizes/font_size = 27
+text = "ACTIVE MODULES"
+horizontal_alignment = 1
+
+[node name="ModulesBody" type="Label" parent="ModulesScreen/Center/Panel/Margin/Layout" unique_id=1235063060]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_font_sizes/font_size = 15
+text = "NO MODULES INSTALLED"
+vertical_alignment = 1
+autowrap_mode = 2
+
+[node name="CloseModulesButton" type="Button" parent="ModulesScreen/Center/Panel/Margin/Layout" unique_id=144574574]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 46)
+layout_mode = 2
+text = "CLOSE"
