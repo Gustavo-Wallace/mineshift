@@ -1,0 +1,140 @@
+[gd_scene format=3 uid="uid://s16rqhf5quqv"]
+
+[ext_resource type="Script" uid="uid://c7ds2sb5ti5ql" path="res://scripts/game/game_controller.gd" id="1_controller"]
+[ext_resource type="Theme" path="res://resources/themes/mineshift_theme.tres" id="2_theme"]
+[ext_resource type="Script" uid="uid://b40x15f1q0byd" path="res://scripts/ui/board_view.gd" id="3_board"]
+
+[node name="Main" type="Control" unique_id=1709777477]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("2_theme")
+script = ExtResource("1_controller")
+
+[node name="Background" type="ColorRect" parent="." unique_id=816349688]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.027, 0.039, 0.059, 1)
+
+[node name="SafeArea" type="MarginContainer" parent="." unique_id=684462580]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 36.0
+offset_top = 24.0
+offset_right = -36.0
+offset_bottom = -24.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Layout" type="VBoxContainer" parent="SafeArea" unique_id=1488555269]
+layout_mode = 2
+theme_override_constants/separation = 22
+
+[node name="HeaderPanel" type="PanelContainer" parent="SafeArea/Layout" unique_id=1255351172]
+layout_mode = 2
+
+[node name="Header" type="HBoxContainer" parent="SafeArea/Layout/HeaderPanel" unique_id=738801966]
+layout_mode = 2
+theme_override_constants/separation = 24
+
+[node name="Brand" type="VBoxContainer" parent="SafeArea/Layout/HeaderPanel/Header" unique_id=1022058903]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 1
+
+[node name="Title" type="Label" parent="SafeArea/Layout/HeaderPanel/Header/Brand" unique_id=280059511]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.396, 0.867, 1, 1)
+theme_override_font_sizes/font_size = 26
+text = "MINESHIFT"
+
+[node name="Subtitle" type="Label" parent="SafeArea/Layout/HeaderPanel/Header/Brand" unique_id=1634727034]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.408, 0.478, 0.584, 1)
+theme_override_font_sizes/font_size = 11
+text = "TACTICAL MINEFIELD // PROTOTYPE 01"
+
+[node name="Metrics" type="HBoxContainer" parent="SafeArea/Layout/HeaderPanel/Header" unique_id=1074368799]
+layout_mode = 2
+size_flags_vertical = 4
+theme_override_constants/separation = 28
+
+[node name="MinesLabel" type="Label" parent="SafeArea/Layout/HeaderPanel/Header/Metrics" unique_id=1118730696]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.882, 0.914, 0.953, 1)
+theme_override_font_sizes/font_size = 16
+text = "MINES 010"
+
+[node name="TimeLabel" type="Label" parent="SafeArea/Layout/HeaderPanel/Header/Metrics" unique_id=1193061684]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.882, 0.914, 0.953, 1)
+theme_override_font_sizes/font_size = 16
+text = "TIME 000"
+
+[node name="StateLabel" type="Label" parent="SafeArea/Layout/HeaderPanel/Header/Metrics" unique_id=1084822950]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(150, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "FIELD READY"
+
+[node name="NewFieldButton" type="Button" parent="SafeArea/Layout/HeaderPanel/Header" unique_id=27077912]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 4
+text = "NEW FIELD"
+
+[node name="PlayArea" type="CenterContainer" parent="SafeArea/Layout" unique_id=1460893061]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="FieldPanel" type="PanelContainer" parent="SafeArea/Layout/PlayArea" unique_id=1990423132]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="FieldLayout" type="VBoxContainer" parent="SafeArea/Layout/PlayArea/FieldPanel" unique_id=1581467437]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="TopRule" type="HBoxContainer" parent="SafeArea/Layout/PlayArea/FieldPanel/FieldLayout" unique_id=587007844]
+layout_mode = 2
+
+[node name="Coordinates" type="Label" parent="SafeArea/Layout/PlayArea/FieldPanel/FieldLayout/TopRule" unique_id=2005969086]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.31, 0.38, 0.48, 1)
+theme_override_font_sizes/font_size = 10
+text = "GRID 09×09"
+
+[node name="Protocol" type="Label" parent="SafeArea/Layout/PlayArea/FieldPanel/FieldLayout/TopRule" unique_id=1363274146]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.31, 0.38, 0.48, 1)
+theme_override_font_sizes/font_size = 10
+text = "SAFE-START ENABLED"
+
+[node name="BoardView" type="GridContainer" parent="SafeArea/Layout/PlayArea/FieldPanel/FieldLayout" unique_id=1224012103]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/h_separation = 3
+theme_override_constants/v_separation = 3
+columns = 9
+script = ExtResource("3_board")
+
+[node name="Help" type="Label" parent="SafeArea/Layout/PlayArea/FieldPanel/FieldLayout" unique_id=1957807571]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.408, 0.478, 0.584, 1)
+theme_override_font_sizes/font_size = 11
+text = "LMB REVEAL   //   RMB MARK   //   R RESET"
+horizontal_alignment = 1
