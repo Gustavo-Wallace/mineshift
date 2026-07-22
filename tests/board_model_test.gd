@@ -125,31 +125,39 @@ func _test_scene_lifecycle() -> void:
 	var game := scene.instantiate() as GameController
 	root.add_child(game)
 	await process_frame
-	_expect(game.state == GameController.GameState.READY, "The scene must start in READY.")
+	_expect(game.start_screen.visible, "The scene must open on the main menu.")
+	_expect(game.run.state == RunController.RunState.NOT_STARTED, "A run must not start before player input.")
+	game.start_new_run()
+	_expect(game.state == GameController.FieldState.READY, "A new run must load Field 1 in READY.")
 	_expect(game.board_view.get_child_count() == BOARD_WIDTH * BOARD_HEIGHT, "The scene must build 81 cells.")
 	var known_safe_flag := Vector2i(3, 3)
 	game._on_flag_requested(known_safe_flag)
 	_expect(game.mines_label.text == "MINES 009", "The HUD mine counter must react to flags.")
 	game._on_reveal_requested(Vector2i(4, 4))
-	_expect(game.state == GameController.GameState.PLAYING, "The first reveal must start PLAYING.")
+	_expect(game.state == GameController.FieldState.PLAYING or game.state == GameController.FieldState.TARGET_REACHED, "The first reveal must start the field.")
 	game._process(1.2)
 	_expect(game.elapsed_time >= 1.0, "The timer must advance while playing.")
 	var elapsed_before_loss := game.elapsed_time
 	var exploded_position := _find_mine(game.board)
 	game._on_reveal_requested(exploded_position)
-	_expect(game.state == GameController.GameState.LOST, "Revealing a mine must enter LOST.")
+	_expect(game.state == GameController.FieldState.LOST, "Revealing a mine must enter LOST.")
+	_expect(game.run.state == RunController.RunState.RUN_LOST, "Revealing a mine must end the run.")
 	_expect(game.state_label.text == "FIELD BREACHED", "A loss must be clearly labeled.")
 	_expect(game.result_panel.visible, "A loss must display the result panel.")
-	_expect(game.result_body.text.contains("FIELD COMPLETE"), "The loss result must include completion percentage.")
+	_expect(game.result_body.text.contains("PROVISIONAL LOST"), "The loss result must identify discarded field score.")
 	_expect(game.scoring.safe_reveal_streak == 0, "A loss must reset the current safe streak.")
 	_expect(game.board_view._get_cell(exploded_position).exploded, "The triggered mine must have a distinct visual state.")
 	_expect(game.board_view._get_cell(known_safe_flag).wrong_flag, "A safe flagged cell must be identified as incorrect.")
 	game._process(1.0)
 	_expect(game.elapsed_time == elapsed_before_loss, "The timer must stop after a loss.")
+	await create_timer(0.8).timeout
+	_expect(game.run_summary_screen.visible and game.run_summary_title.text == "RUN BREACHED", "A run loss must present the final breach summary.")
+
+	game.start_new_run()
 	for reset_index in 5:
-		game.start_new_field()
+		game.restart_current_field()
 		_expect(game.board_view.get_child_count() == BOARD_WIDTH * BOARD_HEIGHT, "Repeated resets must not duplicate cells.")
-		_expect(game.state == GameController.GameState.READY, "Every reset must return to READY.")
+		_expect(game.state == GameController.FieldState.READY, "Every reset must return to READY.")
 		_expect(game.elapsed_time == 0.0, "Every reset must clear the timer.")
 		_expect(game.scoring.current_score == 0 and game.scoring.actions_taken == 0, "Every reset must clear scoring and actions.")
 
@@ -159,24 +167,35 @@ func _test_scene_lifecycle() -> void:
 			var position := Vector2i(x, y)
 			if not game.board.has_mine(position):
 				game._on_reveal_requested(position)
-	_expect(game.state == GameController.GameState.WON, "Revealing all safe cells must enter WON.")
-	_expect(game.state_label.text == "FIELD CLEARED", "A win must be clearly labeled.")
-	_expect(game.result_panel.visible, "A win must display the result panel.")
-	_expect(game.result_body.text.contains("CASCADE BONUS") and game.result_body.text.contains("EFFICIENCY"), "The win result must itemize completion bonuses.")
+	_expect(game.state == GameController.FieldState.TRANSITIONING, "A full clear must enter the field transition.")
+	_expect(game.result_panel.visible, "A full clear must display the field report.")
+	_expect(game.result_body.text.contains("FULL CLEAR") and game.result_body.text.contains("OVERSCORE"), "The field report must itemize run bonuses.")
+	_expect(game.run.confirmed_run_score > 0 and game.run.stats.full_clears == 1, "A full clear must confirm score and run statistics.")
 	var elapsed_before_win_tick := game.elapsed_time
 	game._process(1.0)
 	_expect(game.elapsed_time == elapsed_before_win_tick, "The timer must stop after a win.")
+	var confirmed_before_next_field := game.run.confirmed_run_score
+	game.result_button.pressed.emit()
+	_expect(game.run.current_config().field_number == 2 and game.board.mine_count == 12, "The field report must advance to the configured next field.")
 
 	var reset_event := InputEventAction.new()
 	reset_event.action = "new_field"
 	reset_event.pressed = true
 	game._unhandled_input(reset_event)
-	_expect(game.state == GameController.GameState.READY, "The R action must start a new field.")
+	_expect(game.state == GameController.FieldState.READY, "The R action must restart the current field.")
+	_expect(game.run.current_config().field_number == 2 and game.run.confirmed_run_score == confirmed_before_next_field, "Restarting must preserve the stage and confirmed run score.")
 	game._on_reveal_requested(Vector2i(4, 4))
-	game.new_field_button.pressed.emit()
-	_expect(game.state == GameController.GameState.READY, "The NEW FIELD button must start a new field.")
+	game.restart_field_button.pressed.emit()
+	_expect(game.state == GameController.FieldState.READY, "The restart button must restart only the current field.")
 	await create_timer(1.3).timeout
 	_expect(game.score_feedback.overlay.get_child_count() == 0, "Score feedback nodes must not survive a reset.")
+	game._show_abandon_confirmation()
+	_expect(game.abandon_overlay.visible, "Abandoning a run must require confirmation.")
+	game.cancel_abandon_button.pressed.emit()
+	_expect(not game.abandon_overlay.visible and game.run.state == RunController.RunState.IN_PROGRESS, "Cancelling abandonment must preserve the run.")
+	game._show_abandon_confirmation()
+	game.confirm_abandon_button.pressed.emit()
+	_expect(game.start_screen.visible and game.run.state == RunController.RunState.NOT_STARTED, "Confirming abandonment must clear the run and return to the menu.")
 	game.queue_free()
 	await process_frame
 

@@ -3,7 +3,7 @@
 [ext_resource type="Script" path="res://scripts/ui/mine_cell.gd" id="1_cell"]
 
 [node name="MineCell" type="Control"]
-custom_minimum_size = Vector2(42, 42)
+custom_minimum_size = Vector2(39, 39)
 layout_mode = 3
 anchors_preset = 0
 mouse_filter = 0

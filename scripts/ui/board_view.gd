@@ -14,11 +14,12 @@ func build(board_width: int, board_height: int) -> void:
 	clear()
 	_board_width = board_width
 	columns = board_width
+	var cell_size := _get_cell_size(maxi(board_width, board_height))
 	for y in board_height:
 		for x in board_width:
 			var cell := CELL_SCENE.instantiate() as MineCell
 			var position := Vector2i(x, y)
-			cell.configure(position)
+			cell.configure(position, cell_size)
 			cell.reveal_requested.connect(_on_cell_reveal_requested)
 			cell.flag_toggle_requested.connect(_on_cell_flag_requested)
 			add_child(cell)
@@ -88,6 +89,12 @@ func show_win(model: BoardModel) -> void:
 			)
 
 
+func lock_board(model: BoardModel) -> void:
+	for y in model.height:
+		for x in model.width:
+			refresh_cell(model, Vector2i(x, y), true)
+
+
 func _get_cell(position: Vector2i) -> MineCell:
 	var index := position.y * _board_width + position.x
 	if index < 0 or index >= _cells.size():
@@ -101,3 +108,11 @@ func _on_cell_reveal_requested(position: Vector2i) -> void:
 
 func _on_cell_flag_requested(position: Vector2i) -> void:
 	cell_flag_requested.emit(position)
+
+
+func _get_cell_size(largest_dimension: int) -> float:
+	if largest_dimension >= 11:
+		return 33.0
+	if largest_dimension == 10:
+		return 36.0
+	return 39.0

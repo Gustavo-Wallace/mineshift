@@ -15,8 +15,11 @@ var safe_reveal_streak := 0
 var highest_safe_reveal_streak := 0
 var total_cells_revealed := 0
 var total_cascade_cells := 0
+var flag_placements := 0
 var current_score := 0
 
+var manual_base_points := 0
+var streak_bonus_points := 0
 var manual_reveal_points := 0
 var cascade_cell_points := 0
 var cascade_bonus_points := 0
@@ -25,6 +28,7 @@ var clear_bonus_points := 0
 var accuracy_bonus_points := 0
 var efficiency_bonus_points := 0
 var event_history: Array[ScoreEvent] = []
+var completion_bonuses_applied := false
 
 
 func reset() -> void:
@@ -33,7 +37,10 @@ func reset() -> void:
 	highest_safe_reveal_streak = 0
 	total_cells_revealed = 0
 	total_cascade_cells = 0
+	flag_placements = 0
 	current_score = 0
+	manual_base_points = 0
+	streak_bonus_points = 0
 	manual_reveal_points = 0
 	cascade_cell_points = 0
 	cascade_bonus_points = 0
@@ -42,11 +49,14 @@ func reset() -> void:
 	accuracy_bonus_points = 0
 	efficiency_bonus_points = 0
 	event_history.clear()
+	completion_bonuses_applied = false
 	metrics_changed.emit()
 
 
-func record_flag_action() -> void:
+func record_flag_action(placed: bool = true) -> void:
 	actions_taken += 1
+	if placed:
+		flag_placements += 1
 	metrics_changed.emit()
 
 
@@ -74,6 +84,8 @@ func record_manual_reveal(
 	event.streak_multiplier = multiplier
 	event.manual_final_score = int(round(event.manual_base_score * multiplier))
 	event.total_score += event.manual_final_score
+	manual_base_points += event.manual_base_score
+	streak_bonus_points += event.manual_final_score - event.manual_base_score
 	manual_reveal_points += event.manual_final_score
 	total_cells_revealed += 1 + automatic_adjacent_counts.size()
 	_commit_event(event)
@@ -97,11 +109,26 @@ func record_chord(
 
 
 func apply_victory_bonuses(correct_flags: int, incorrect_flags: int) -> void:
+	if completion_bonuses_applied:
+		return
+	completion_bonuses_applied = true
 	flag_bonus_points = correct_flags * CORRECT_FLAG_BONUS
 	clear_bonus_points = FIELD_CLEAR_BONUS
 	accuracy_bonus_points = get_accuracy_bonus(incorrect_flags)
 	efficiency_bonus_points = get_efficiency_bonus(actions_taken)
 	current_score += flag_bonus_points + clear_bonus_points + accuracy_bonus_points + efficiency_bonus_points
+	metrics_changed.emit()
+
+
+func apply_shift_bonuses(correct_flags: int, incorrect_flags: int) -> void:
+	if completion_bonuses_applied:
+		return
+	completion_bonuses_applied = true
+	flag_bonus_points = correct_flags * CORRECT_FLAG_BONUS
+	clear_bonus_points = 0
+	accuracy_bonus_points = get_accuracy_bonus(incorrect_flags)
+	efficiency_bonus_points = get_efficiency_bonus(actions_taken)
+	current_score += flag_bonus_points + accuracy_bonus_points + efficiency_bonus_points
 	metrics_changed.emit()
 
 

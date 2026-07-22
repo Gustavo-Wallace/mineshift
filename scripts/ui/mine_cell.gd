@@ -4,7 +4,7 @@ extends Control
 signal reveal_requested(position: Vector2i)
 signal flag_toggle_requested(position: Vector2i)
 
-const CELL_SIZE := Vector2(42.0, 42.0)
+const DEFAULT_CELL_SIZE := 39.0
 const NUMBER_COLORS: Array[Color] = [
 	Color.TRANSPARENT,
 	Color("62c6ff"),
@@ -32,15 +32,21 @@ var _pressed := false
 
 
 func _ready() -> void:
-	custom_minimum_size = CELL_SIZE
+	if custom_minimum_size == Vector2.ZERO:
+		set_cell_size(DEFAULT_CELL_SIZE)
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	focus_mode = Control.FOCUS_ALL
 	queue_redraw()
 
 
-func configure(position: Vector2i) -> void:
+func configure(position: Vector2i, cell_size: float = DEFAULT_CELL_SIZE) -> void:
 	board_position = position
+	set_cell_size(cell_size)
 	tooltip_text = "Cell %d, %d" % [position.x + 1, position.y + 1]
+
+
+func set_cell_size(cell_size: float) -> void:
+	custom_minimum_size = Vector2(cell_size, cell_size)
 
 
 func set_visual_state(
@@ -146,7 +152,7 @@ func _draw_revealed(rect: Rect2) -> void:
 
 func _draw_number(rect: Rect2) -> void:
 	var font := ThemeDB.fallback_font
-	var font_size := 22
+	var font_size := maxi(17, int(minf(size.x, size.y) * 0.52))
 	var text := str(adjacent_count)
 	var text_size := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
 	var origin := Vector2((rect.size.x - text_size.x) * 0.5, (rect.size.y + text_size.y) * 0.5 - 2.0)

@@ -64,6 +64,25 @@ corner_radius_top_right = 6
 corner_radius_bottom_right = 6
 corner_radius_bottom_left = 6
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxProgressBackground"]
+bg_color = Color(0.035, 0.055, 0.086, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.145, 0.196, 0.278, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxProgressFill"]
+bg_color = Color(0.396, 0.867, 1, 0.8)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
 [resource]
 default_font_size = 16
 Button/colors/font_color = Color(0.396, 0.867, 1, 1)
@@ -76,3 +95,5 @@ Button/styles/normal = SubResource("StyleBoxButtonNormal")
 Button/styles/pressed = SubResource("StyleBoxButtonPressed")
 Label/colors/font_color = Color(0.882, 0.914, 0.953, 1)
 PanelContainer/styles/panel = SubResource("StyleBoxPanel")
+ProgressBar/styles/background = SubResource("StyleBoxProgressBackground")
+ProgressBar/styles/fill = SubResource("StyleBoxProgressFill")

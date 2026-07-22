@@ -76,6 +76,8 @@ func _test_completion_bonuses() -> void:
 	_expect(scoring.accuracy_bonus_points == 250, "Perfect flag accuracy must award 250 points.")
 	_expect(scoring.efficiency_bonus_points == 300, "At most 25 actions must award 300 efficiency points.")
 	_expect(scoring.current_score == 1095, "Victory bonus total is incorrect.")
+	scoring.apply_victory_bonuses(3, 0)
+	_expect(scoring.current_score == 1095, "Completion bonuses must not be applied twice.")
 	_expect(scoring.get_accuracy_bonus(1) == 100 and scoring.get_accuracy_bonus(2) == 0, "Accuracy bonus thresholds are incorrect.")
 	_expect(scoring.get_efficiency_bonus(26) == 200, "The 26-35 efficiency tier is incorrect.")
 	_expect(scoring.get_efficiency_bonus(36) == 100, "The 36-50 efficiency tier is incorrect.")
