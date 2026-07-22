@@ -21,6 +21,7 @@ var board_position := Vector2i.ZERO
 var revealed := false
 var flagged := false
 var contains_mine := false
+var neutralized := false
 var adjacent_count := 0
 var exploded := false
 var wrong_flag := false
@@ -55,6 +56,7 @@ func set_visual_state(
 	is_flagged: bool,
 	has_mine: bool,
 	nearby_mines: int,
+	is_neutralized: bool = false,
 	is_exploded: bool = false,
 	is_wrong_flag: bool = false,
 	is_locked: bool = false,
@@ -64,6 +66,7 @@ func set_visual_state(
 	revealed = is_revealed
 	flagged = is_flagged
 	contains_mine = has_mine
+	neutralized = is_neutralized
 	adjacent_count = nearby_mines
 	exploded = is_exploded
 	wrong_flag = is_wrong_flag
@@ -72,6 +75,13 @@ func set_visual_state(
 	resolved = is_resolved
 	mouse_default_cursor_shape = Control.CURSOR_ARROW if locked else Control.CURSOR_POINTING_HAND
 	queue_redraw()
+
+
+func pulse_recalculation() -> void:
+	pivot_offset = size * 0.5
+	var tween := create_tween()
+	tween.tween_property(self, "scale", Vector2(1.08, 1.08), 0.09).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(self, "scale", Vector2.ONE, 0.13).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
 
 
 func _gui_input(event: InputEvent) -> void:
@@ -109,19 +119,21 @@ func _notification(what: int) -> void:
 
 func _draw() -> void:
 	var rect := Rect2(Vector2.ZERO, size)
-	if revealed or (contains_mine and locked):
+	if revealed or neutralized or (contains_mine and locked):
 		_draw_revealed(rect)
 	else:
 		_draw_closed(rect)
 
 	if wrong_flag:
 		_draw_wrong_flag(rect)
+	elif neutralized:
+		_draw_neutralized_mine(rect)
 	elif flagged:
 		_draw_flag(rect, Color("67e8a5") if resolved else Color("65ddff"))
 	elif contains_mine and locked:
 		_draw_mine(rect)
 
-	if revealed and not contains_mine and adjacent_count > 0:
+	if revealed and not contains_mine and not neutralized and adjacent_count > 0:
 		_draw_number(rect)
 
 	if has_focus() and not locked:
@@ -149,6 +161,9 @@ func _draw_revealed(rect: Rect2) -> void:
 	if exploded:
 		fill = Color("6b2433")
 		border = Color("ff7185")
+	elif neutralized:
+		fill = Color("1c252d")
+		border = Color("7b8da1")
 	elif resolved:
 		fill = Color("142a27")
 		border = Color("67e8a5")
@@ -189,6 +204,19 @@ func _draw_mine(rect: Rect2) -> void:
 	for direction in [Vector2(1, 1).normalized(), Vector2(-1, 1).normalized(), Vector2(1, -1).normalized(), Vector2(-1, -1).normalized()]:
 		draw_line(center + direction * radius, center + direction * radius * 1.45, color, 1.5)
 	draw_circle(center - Vector2(radius * 0.3, radius * 0.3), radius * 0.2, Color("141c29"))
+
+
+func _draw_neutralized_mine(rect: Rect2) -> void:
+	var center := rect.get_center()
+	var unit := minf(size.x, size.y) / 44.0
+	var color := Color("ff7185") if exploded else Color("8fa0b4")
+	var radius := 8.0 * unit
+	draw_circle(center, radius, Color("141c29"))
+	draw_arc(center, radius, 0.0, TAU, 24, color, 2.2 * unit)
+	for direction in [Vector2.UP, Vector2.RIGHT, Vector2.DOWN, Vector2.LEFT]:
+		draw_line(center + direction * radius, center + direction * radius * 1.5, color, 1.8 * unit)
+	draw_line(center - Vector2(12, 12) * unit, center + Vector2(12, 12) * unit, color, 3.0 * unit)
+	draw_line(center + Vector2(-10, 10) * unit, center + Vector2(10, -10) * unit, color.darkened(0.2), 1.5 * unit)
 
 
 func _draw_wrong_flag(rect: Rect2) -> void:

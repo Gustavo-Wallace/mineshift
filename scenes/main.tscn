@@ -90,6 +90,16 @@ theme_override_font_sizes/font_size = 16
 text = "READY"
 vertical_alignment = 1
 
+[node name="IntegrityLabel" type="Label" parent="GameScreen/GameMargin/GameLayout/TopBar/TopMargin/TopContent" unique_id=1639853680]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(158, 0)
+layout_mode = 2
+tooltip_text = "Integrity: 3 / 3"
+theme_override_colors/font_color = Color(0.396, 0.867, 1, 1)
+theme_override_font_sizes/font_size = 15
+text = "INTEGRITY  ■ ■ ■"
+vertical_alignment = 1
+
 [node name="MinesLabel" type="Label" parent="GameScreen/GameMargin/GameLayout/TopBar/TopMargin/TopContent" unique_id=985484577]
 unique_name_in_owner = true
 layout_mode = 2
@@ -145,6 +155,22 @@ theme_override_constants/h_separation = 2
 theme_override_constants/v_separation = 2
 script = ExtResource("3_board")
 
+[node name="BreachLabel" type="Label" parent="GameScreen" unique_id=766351208]
+unique_name_in_owner = true
+visible = false
+z_index = 5
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 88.0
+offset_bottom = 120.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(1, 0.443, 0.522, 1)
+theme_override_font_sizes/font_size = 18
+text = "BREACH — INTEGRITY -1"
+horizontal_alignment = 1
+vertical_alignment = 1
+
 [node name="StartScreen" type="Control" parent="." unique_id=1670366462]
 unique_name_in_owner = true
 layout_mode = 1
@@ -198,7 +224,7 @@ layout_mode = 2
 layout_mode = 2
 text = "LEFT CLICK  Reveal or chord
 RIGHT CLICK  Mark a mine
-R  Restart field
+R  Restart field (costs integrity)
 ESC  Pause"
 horizontal_alignment = 1
 
@@ -415,7 +441,7 @@ text = "RESUME"
 [node name="PauseRestartButton" type="Button" parent="PauseScreen/Center/Panel/Margin/Layout" unique_id=1025734974]
 unique_name_in_owner = true
 layout_mode = 2
-text = "RESTART FIELD"
+text = "RESTART FIELD — COST 1 INTEGRITY"
 
 [node name="PauseAbandonButton" type="Button" parent="PauseScreen/Center/Panel/Margin/Layout" unique_id=2125001800]
 unique_name_in_owner = true

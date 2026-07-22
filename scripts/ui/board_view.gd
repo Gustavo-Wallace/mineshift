@@ -43,6 +43,7 @@ func refresh_cell(model: BoardModel, cell_position: Vector2i, locked: bool = fal
 		model.is_flagged(cell_position),
 		model.has_mine(cell_position),
 		model.adjacent_mines(cell_position),
+		model.is_neutralized(cell_position),
 		false,
 		false,
 		locked,
@@ -57,7 +58,7 @@ func get_cell_global_center(cell_position: Vector2i) -> Vector2:
 	return cell.global_position + cell.size * 0.5
 
 
-func show_loss(model: BoardModel, exploded_position: Vector2i) -> void:
+func show_breach(model: BoardModel, detonated_positions: Array[Vector2i]) -> void:
 	for y in model.height:
 		for x in model.width:
 			var cell_position := Vector2i(x, y)
@@ -67,7 +68,25 @@ func show_loss(model: BoardModel, exploded_position: Vector2i) -> void:
 				model.is_flagged(cell_position),
 				model.has_mine(cell_position),
 				model.adjacent_mines(cell_position),
-				cell_position == exploded_position,
+				model.is_neutralized(cell_position),
+				detonated_positions.has(cell_position),
+				false,
+				true
+			)
+
+
+func present_run_loss(model: BoardModel, fatal_positions: Array[Vector2i]) -> void:
+	for y in model.height:
+		for x in model.width:
+			var cell_position := Vector2i(x, y)
+			var cell := _get_cell(cell_position)
+			cell.set_visual_state(
+				model.is_revealed(cell_position),
+				model.is_flagged(cell_position),
+				model.has_mine(cell_position),
+				model.adjacent_mines(cell_position),
+				model.is_neutralized(cell_position),
+				fatal_positions.has(cell_position),
 				model.is_flagged(cell_position) and not model.has_mine(cell_position),
 				true
 			)
@@ -83,6 +102,7 @@ func show_win(model: BoardModel) -> void:
 				model.is_flagged(cell_position) or model.has_mine(cell_position),
 				model.has_mine(cell_position),
 				model.adjacent_mines(cell_position),
+				model.is_neutralized(cell_position),
 				false,
 				false,
 				true,
@@ -95,6 +115,14 @@ func lock_board(model: BoardModel) -> void:
 	for y in model.height:
 		for x in model.width:
 			refresh_cell(model, Vector2i(x, y), true)
+
+
+func refresh_recalculated(model: BoardModel, positions: Array[Vector2i]) -> void:
+	for cell_position in positions:
+		refresh_cell(model, cell_position)
+		var cell := _get_cell(cell_position)
+		if cell != null and model.is_revealed(cell_position) and not model.is_neutralized(cell_position):
+			cell.pulse_recalculation()
 
 
 func _get_cell(cell_position: Vector2i) -> MineCell:
