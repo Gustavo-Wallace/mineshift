@@ -140,6 +140,13 @@ layout_mode = 2
 theme_override_constants/separation = 8
 alignment = 1
 
+[node name="FieldShiftButton" type="Button" parent="GameScreen/GameMargin/GameLayout/ModuleBar" unique_id=1587231128]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(92, 28)
+layout_mode = 2
+tooltip_text = "Rotate a covered 2×2 region. Left Click: clockwise. Right Click: counter-clockwise."
+text = "SHIFT 1"
+
 [node name="ModulesButton" type="Button" parent="GameScreen/GameMargin/GameLayout/ModuleBar" unique_id=1178936893]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(92, 28)
@@ -238,7 +245,7 @@ grow_horizontal = 2
 grow_vertical = 2
 
 [node name="StartPanel" type="PanelContainer" parent="StartScreen/StartCenter" unique_id=1536200868]
-custom_minimum_size = Vector2(510, 380)
+custom_minimum_size = Vector2(560, 460)
 layout_mode = 2
 
 [node name="StartMargin" type="MarginContainer" parent="StartScreen/StartCenter/StartPanel" unique_id=193623264]
@@ -274,8 +281,14 @@ layout_mode = 2
 text = "LEFT CLICK  Reveal or chord
 RIGHT CLICK  Mark a mine
 SHIFT + LEFT CLICK  Logic Probe (when installed)
+SPACE  Field Shift
+  LEFT CLICK  Rotate clockwise
+  RIGHT CLICK  Rotate counter-clockwise
+  ESC  Cancel
 R  Restart field (costs integrity)
-ESC  Pause"
+ESC  Pause
+
+Field Shift rotates mines and flags inside a covered 2×2 area."
 horizontal_alignment = 1
 
 [node name="StartSpacer" type="Control" parent="StartScreen/StartCenter/StartPanel/StartMargin/StartLayout" unique_id=68303224]

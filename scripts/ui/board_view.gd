@@ -3,6 +3,8 @@ extends GridContainer
 
 signal cell_reveal_requested(cell_position: Vector2i, logic_probe_requested: bool)
 signal cell_flag_requested(cell_position: Vector2i)
+signal field_shift_requested(anchor: Vector2i, clockwise: bool)
+signal cell_hover_changed(cell_position: Vector2i, entered: bool)
 
 const CELL_SCENE: PackedScene = preload("res://scenes/ui/mine_cell.tscn")
 
@@ -22,6 +24,8 @@ func build(board_width: int, board_height: int) -> void:
 			cell.configure(cell_position, cell_size)
 			cell.reveal_requested.connect(_on_cell_reveal_requested)
 			cell.flag_toggle_requested.connect(_on_cell_flag_requested)
+			cell.field_shift_requested.connect(_on_field_shift_requested)
+			cell.hover_changed.connect(_on_cell_hover_changed)
 			add_child(cell)
 			_cells.append(cell)
 
@@ -141,6 +145,39 @@ func set_logic_probe_mode(enabled: bool) -> void:
 		cell.set_logic_probe_mode(enabled)
 
 
+func set_field_shift_mode(enabled: bool) -> void:
+	for cell in _cells:
+		cell.set_field_shift_mode(enabled)
+
+
+func show_field_shift_region(anchor: Vector2i, valid: bool) -> void:
+	clear_field_shift_region()
+	if not valid:
+		return
+	for cell_position in [anchor, anchor + Vector2i.RIGHT, anchor + Vector2i.DOWN, anchor + Vector2i(1, 1)]:
+		var cell := _get_cell(cell_position)
+		if cell != null:
+			cell.set_field_shift_highlight(true, cell_position == anchor)
+
+
+func clear_field_shift_region() -> void:
+	for cell in _cells:
+		cell.set_field_shift_highlight(false)
+
+
+func animate_field_shift(model: BoardModel, result: FieldShiftResult) -> void:
+	for affected_position in result.affected_positions:
+		refresh_cell(model, affected_position, true)
+	for animation_index in result.affected_positions.size():
+		var cell := _get_cell(result.affected_positions[animation_index])
+		if cell != null:
+			cell.animate_field_shift(result.direction == FieldShiftResult.Direction.CLOCKWISE, float(animation_index) * 0.035)
+	refresh_recalculated(model, result.numbers_changed)
+	await get_tree().create_timer(0.44).timeout
+	for affected_position in result.affected_positions:
+		refresh_cell(model, affected_position)
+
+
 func _get_cell(cell_position: Vector2i) -> MineCell:
 	var index := cell_position.y * _board_width + cell_position.x
 	if index < 0 or index >= _cells.size():
@@ -154,6 +191,14 @@ func _on_cell_reveal_requested(cell_position: Vector2i, logic_probe_requested: b
 
 func _on_cell_flag_requested(cell_position: Vector2i) -> void:
 	cell_flag_requested.emit(cell_position)
+
+
+func _on_field_shift_requested(anchor: Vector2i, clockwise: bool) -> void:
+	field_shift_requested.emit(anchor, clockwise)
+
+
+func _on_cell_hover_changed(cell_position: Vector2i, entered: bool) -> void:
+	cell_hover_changed.emit(cell_position, entered)
 
 
 func _get_cell_size(largest_dimension: int) -> float:

@@ -3,6 +3,8 @@ extends Control
 
 signal reveal_requested(position: Vector2i, logic_probe_requested: bool)
 signal flag_toggle_requested(position: Vector2i)
+signal field_shift_requested(position: Vector2i, clockwise: bool)
+signal hover_changed(position: Vector2i, entered: bool)
 
 const DEFAULT_CELL_SIZE := 54.0
 const NUMBER_COLORS: Array[Color] = [
@@ -22,6 +24,9 @@ var revealed := false
 var flagged := false
 var confirmed_flag := false
 var logic_probe_mode := false
+var field_shift_mode := false
+var field_shift_highlight := false
+var field_shift_anchor := false
 var contains_mine := false
 var neutralized := false
 var adjacent_count := 0
@@ -90,13 +95,49 @@ func pulse_recalculation() -> void:
 
 func set_logic_probe_mode(enabled: bool) -> void:
 	logic_probe_mode = enabled
-	mouse_default_cursor_shape = Control.CURSOR_CROSS if enabled and not revealed and not flagged and not neutralized and not locked else (Control.CURSOR_ARROW if locked else Control.CURSOR_POINTING_HAND)
+	mouse_default_cursor_shape = Control.CURSOR_CROSS if field_shift_mode or (enabled and not revealed and not flagged and not neutralized and not locked) else (Control.CURSOR_ARROW if locked else Control.CURSOR_POINTING_HAND)
 	queue_redraw()
+
+
+func set_field_shift_mode(enabled: bool) -> void:
+	field_shift_mode = enabled
+	if not enabled:
+		field_shift_highlight = false
+		field_shift_anchor = false
+	mouse_default_cursor_shape = Control.CURSOR_CROSS if enabled or (logic_probe_mode and not revealed and not flagged and not neutralized and not locked) else (Control.CURSOR_ARROW if locked else Control.CURSOR_POINTING_HAND)
+	queue_redraw()
+
+
+func set_field_shift_highlight(enabled: bool, is_anchor: bool = false) -> void:
+	field_shift_highlight = enabled
+	field_shift_anchor = enabled and is_anchor
+	queue_redraw()
+
+
+func animate_field_shift(clockwise: bool, delay: float) -> void:
+	pivot_offset = size * 0.5
+	var tween := create_tween()
+	tween.tween_interval(delay)
+	tween.tween_property(self, "rotation", 0.10 if clockwise else -0.10, 0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_property(self, "scale", Vector2(0.92, 0.92), 0.12)
+	tween.tween_property(self, "rotation", 0.0, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_property(self, "scale", Vector2.ONE, 0.18)
 
 
 func _gui_input(event: InputEvent) -> void:
 	if locked:
 		return
+	if field_shift_mode and event is InputEventMouseButton:
+		var shift_mouse := event as InputEventMouseButton
+		if shift_mouse.button_index == MOUSE_BUTTON_LEFT:
+			if not shift_mouse.pressed:
+				field_shift_requested.emit(board_position, true)
+			accept_event()
+			return
+		if shift_mouse.button_index == MOUSE_BUTTON_RIGHT and shift_mouse.pressed:
+			field_shift_requested.emit(board_position, false)
+			accept_event()
+			return
 	if event is InputEventMouseButton:
 		var mouse_event := event as InputEventMouseButton
 		if mouse_event.button_index == MOUSE_BUTTON_LEFT:
@@ -118,9 +159,11 @@ func _gui_input(event: InputEvent) -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_MOUSE_ENTER:
 		_hovered = true
+		hover_changed.emit(board_position, true)
 		queue_redraw()
 	elif what == NOTIFICATION_MOUSE_EXIT:
 		_hovered = false
+		hover_changed.emit(board_position, false)
 		_pressed = false
 		queue_redraw()
 	elif what == NOTIFICATION_FOCUS_ENTER or what == NOTIFICATION_FOCUS_EXIT:
@@ -148,7 +191,14 @@ func _draw() -> void:
 	if revealed and not contains_mine and not neutralized and adjacent_count > 0:
 		_draw_number(rect)
 
-	if has_focus() and not locked:
+	if field_shift_highlight:
+		draw_rect(rect.grow(-2.0), Color("ffca5c"), false, 2.5)
+		if field_shift_anchor:
+			var center := rect.get_center()
+			var radius := minf(size.x, size.y) * 0.22
+			draw_arc(center, radius, -PI * 0.8, PI * 0.75, 18, Color("ffca5c"), 2.0)
+			draw_line(center + Vector2(radius * 0.7, radius * 0.7), center + Vector2(radius * 1.15, radius * 0.55), Color("ffca5c"), 2.0)
+	elif has_focus() and not locked:
 		draw_rect(rect.grow(-2.0), Color("a5efff"), false, 1.5)
 	elif logic_probe_mode and _hovered and not revealed and not flagged and not neutralized and not locked:
 		draw_rect(rect.grow(-3.0), Color("f06dff"), false, 2.5)

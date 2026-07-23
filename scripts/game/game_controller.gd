@@ -5,7 +5,7 @@ signal breach_started(positions: Array[Vector2i])
 signal breach_recovered
 signal field_restart_requested
 
-enum FieldState { READY, PLAYING, BREACH_RECOVERY, CLEARED, LOST }
+enum FieldState { READY, PLAYING, SHIFTING, BREACH_RECOVERY, CLEARED, LOST }
 enum ConfirmationMode { NONE, LEAVE_RUN, RESTART_FIELD }
 
 const BREACH_SETTLE_TIME := 0.16
@@ -24,6 +24,7 @@ const BREACH_RECOVERY_TIME := 0.26
 @onready var pause_button: Button = %PauseButton
 @onready var abandon_button: Button = %AbandonButton
 @onready var breach_label: Label = %BreachLabel
+@onready var field_shift_button: Button = %FieldShiftButton
 @onready var modules_button: Button = %ModulesButton
 @onready var module_slots: Array[Label] = [%ModuleSlot1, %ModuleSlot2, %ModuleSlot3, %ModuleSlot4]
 
@@ -64,6 +65,7 @@ const BREACH_RECOVERY_TIME := 0.26
 var board: BoardModel
 var run := RunController.new()
 var modules := ModuleController.new()
+var field_shift := FieldShiftController.new()
 var state := FieldState.READY
 var elapsed_time := 0.0
 var _displayed_second := -1
@@ -72,11 +74,14 @@ var _confirmation_mode := ConfirmationMode.NONE
 var _confirmation_returns_to_pause := false
 var _breach_sequence := 0
 var _logic_probe_mode := false
+var _shift_hover_anchor := Vector2i(-1, -1)
 
 
 func _ready() -> void:
 	board_view.cell_reveal_requested.connect(_on_reveal_requested)
 	board_view.cell_flag_requested.connect(_on_flag_requested)
+	board_view.field_shift_requested.connect(_on_field_shift_requested)
+	board_view.cell_hover_changed.connect(_on_shift_hover_changed)
 	start_run_button.pressed.connect(start_new_run)
 	restart_button.pressed.connect(_show_restart_confirmation)
 	pause_button.pressed.connect(_show_pause)
@@ -91,6 +96,7 @@ func _ready() -> void:
 	confirm_action_button.pressed.connect(_confirm_current_dialog)
 	cancel_confirm_button.pressed.connect(_cancel_confirmation)
 	modules_button.pressed.connect(_show_modules_panel)
+	field_shift_button.pressed.connect(_toggle_field_shift_mode)
 	close_modules_button.pressed.connect(_close_modules_panel)
 	for option_index in module_option_buttons.size():
 		module_option_buttons[option_index].pressed.connect(_on_module_option_pressed.bind(option_index))
@@ -98,8 +104,15 @@ func _ready() -> void:
 	back_module_button.pressed.connect(_cancel_module_confirmation)
 	run.integrity_changed.connect(_on_integrity_changed)
 	modules.field_state_changed.connect(_update_module_hud)
+	field_shift.state_changed.connect(_on_field_shift_state_changed)
 	get_viewport().size_changed.connect(_update_module_choice_layout)
 	_show_main_menu()
+
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_SPACE:
+		if run.state == RunController.RunState.IN_PROGRESS and game_screen.visible and _toggle_field_shift_mode():
+			get_viewport().set_input_as_handled()
 
 
 func _process(delta: float) -> void:
@@ -134,10 +147,15 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if run.state != RunController.RunState.IN_PROGRESS:
 		return
+	if field_shift.state == FieldShiftController.ShiftState.ACTIVE and event.is_action_pressed("ui_cancel"):
+		_cancel_field_shift_mode()
+		get_viewport().set_input_as_handled()
+		return
 	if event is InputEventKey and not event.echo:
 		var key_event := event as InputEventKey
 		if key_event.keycode == KEY_SHIFT:
-			_set_logic_probe_mode(key_event.pressed)
+			if field_shift.state != FieldShiftController.ShiftState.ACTIVE and field_shift.state != FieldShiftController.ShiftState.ANIMATING:
+				_set_logic_probe_mode(key_event.pressed)
 			return
 	if event.is_action_pressed("ui_cancel") and (state == FieldState.READY or state == FieldState.PLAYING):
 		_show_pause()
@@ -153,6 +171,7 @@ func start_new_run() -> void:
 	_confirmation_mode = ConfirmationMode.NONE
 	_set_logic_probe_mode(false)
 	modules.on_run_started()
+	field_shift.start_run()
 	run.start_run()
 	start_screen.hide()
 	run_summary_screen.hide()
@@ -165,7 +184,7 @@ func start_new_run() -> void:
 
 func restart_current_field() -> bool:
 	var waive_cost := modules.restart_is_free()
-	if state == FieldState.BREACH_RECOVERY or not run.can_restart_attempt(waive_cost):
+	if state == FieldState.BREACH_RECOVERY or state == FieldState.SHIFTING or not run.can_restart_attempt(waive_cost):
 		return false
 	if waive_cost and not modules.consume_restart_cache():
 		return false
@@ -188,6 +207,8 @@ func return_to_main_menu() -> void:
 	_paused = false
 	_confirmation_mode = ConfirmationMode.NONE
 	modules.abandon_run()
+	field_shift.end_run()
+	_reset_field_shift_ui()
 	run.abandon_run()
 	if board != null:
 		board_view.clear()
@@ -215,6 +236,8 @@ func _load_current_field() -> void:
 	board = BoardModel.new(field_config.width, field_config.height, field_config.mine_count)
 	board_view.build(field_config.width, field_config.height)
 	modules.on_field_started(field_config.field_number)
+	field_shift.start_field(field_config.field_number)
+	_reset_field_shift_ui()
 	field_result_screen.hide()
 	breach_label.hide()
 	restart_button.disabled = not run.can_restart_attempt(modules.restart_is_free())
@@ -228,6 +251,8 @@ func _load_current_field() -> void:
 
 
 func _on_reveal_requested(cell_position: Vector2i, logic_probe_requested: bool = false) -> void:
+	if field_shift.state == FieldShiftController.ShiftState.ACTIVE or field_shift.state == FieldShiftController.ShiftState.ANIMATING:
+		return
 	if logic_probe_requested and modules.has_module(ModuleController.LOGIC_PROBE):
 		_use_logic_probe(cell_position)
 		return
@@ -240,16 +265,19 @@ func _on_reveal_requested(cell_position: Vector2i, logic_probe_requested: bool =
 	if is_opening_reveal:
 		board.generate_mines(cell_position, modules.opening_protection_radius())
 		state = FieldState.PLAYING
+		field_shift.notify_board_generated()
 		if modules.has_module(ModuleController.EXPANDED_START):
 			_show_temporary_feedback("EXPANDED SAFE START")
 	var action: BoardActionResult = board.perform_reveal_action(cell_position)
 	if is_opening_reveal and modules.has_module(ModuleController.EXPANDED_START):
 		modules.record_expanded_opening(action.safe_revealed.size())
 	_handle_board_action(action)
+	if is_opening_reveal and state == FieldState.PLAYING and run.current_config().field_number == 1 and field_shift.consume_tutorial_prompt():
+		_show_temporary_feedback("FIELD SHIFT READY\nPRESS SPACE TO ROTATE A COVERED 2×2 AREA")
 
 
 func _use_logic_probe(cell_position: Vector2i) -> void:
-	if _paused or state == FieldState.BREACH_RECOVERY or state == FieldState.CLEARED or state == FieldState.LOST:
+	if _paused or field_shift.state == FieldShiftController.ShiftState.ACTIVE or field_shift.state == FieldShiftController.ShiftState.ANIMATING or state == FieldState.BREACH_RECOVERY or state == FieldState.CLEARED or state == FieldState.LOST:
 		return
 	var probe_runtime := modules.get_runtime(ModuleController.LOGIC_PROBE)
 	if probe_runtime == null:
@@ -368,7 +396,7 @@ func _recover_from_breach(action: BoardActionResult) -> void:
 
 
 func _on_flag_requested(cell_position: Vector2i) -> void:
-	if _paused or (state != FieldState.READY and state != FieldState.PLAYING):
+	if _paused or field_shift.state == FieldShiftController.ShiftState.ACTIVE or field_shift.state == FieldShiftController.ShiftState.ANIMATING or (state != FieldState.READY and state != FieldState.PLAYING):
 		return
 	var was_flagged := board.is_flagged(cell_position)
 	if board.toggle_flag(cell_position):
@@ -384,6 +412,86 @@ func _on_flag_requested(cell_position: Vector2i) -> void:
 				_handle_board_action(auto_action)
 				return
 		_update_hud()
+
+
+func _toggle_field_shift_mode() -> bool:
+	if field_shift.state == FieldShiftController.ShiftState.ACTIVE:
+		_cancel_field_shift_mode()
+		return true
+	if _paused or state == FieldState.SHIFTING or field_result_screen.visible or run_summary_screen.visible or modules_screen.visible or pause_screen.visible or confirm_overlay.visible:
+		return false
+	if run.state != RunController.RunState.IN_PROGRESS or (state != FieldState.READY and state != FieldState.PLAYING):
+		return false
+	if state == FieldState.READY or board == null or not board.mines_are_placed:
+		_show_temporary_feedback("REVEAL A CELL FIRST")
+		return true
+	if not field_shift.charge_available or field_shift.state == FieldShiftController.ShiftState.USED:
+		_show_temporary_feedback("FIELD SHIFT ALREADY USED")
+		return true
+	if not field_shift.has_valid_region(board):
+		_show_temporary_feedback("NO VALID SHIFT AREA")
+		return true
+	_set_logic_probe_mode(false)
+	if not field_shift.enter_mode(board):
+		return true
+	_shift_hover_anchor = Vector2i(-1, -1)
+	board_view.set_field_shift_mode(true)
+	board_view.clear_field_shift_region()
+	breach_label.text = "FIELD SHIFT ACTIVE"
+	breach_label.modulate = Color("ffca5c")
+	breach_label.show()
+	_update_hud()
+	return true
+
+
+func _cancel_field_shift_mode() -> void:
+	field_shift.cancel_mode()
+	_reset_field_shift_ui()
+	if breach_label.text == "FIELD SHIFT ACTIVE" or breach_label.text == "INVALID SHIFT AREA":
+		breach_label.hide()
+	_update_hud()
+
+
+func _reset_field_shift_ui() -> void:
+	_shift_hover_anchor = Vector2i(-1, -1)
+	if board_view != null:
+		board_view.set_field_shift_mode(false)
+		board_view.clear_field_shift_region()
+
+
+func _on_shift_hover_changed(cell_position: Vector2i, entered: bool) -> void:
+	if field_shift.state != FieldShiftController.ShiftState.ACTIVE or board == null:
+		return
+	if entered:
+		_shift_hover_anchor = cell_position
+		board_view.show_field_shift_region(cell_position, board.is_shift_region_valid(cell_position))
+	elif cell_position == _shift_hover_anchor:
+		_shift_hover_anchor = Vector2i(-1, -1)
+		board_view.clear_field_shift_region()
+
+
+func _on_field_shift_requested(anchor: Vector2i, clockwise: bool) -> void:
+	if field_shift.state != FieldShiftController.ShiftState.ACTIVE or state != FieldState.PLAYING:
+		return
+	var result: FieldShiftResult = field_shift.execute(board, anchor, clockwise)
+	if not result.succeeded:
+		_show_temporary_feedback("INVALID SHIFT AREA")
+		return
+	state = FieldState.SHIFTING
+	_set_logic_probe_mode(false)
+	_reset_field_shift_ui()
+	_update_hud()
+	var shift_board := board
+	var shift_sequence := _breach_sequence
+	await board_view.animate_field_shift(board, result)
+	if board != shift_board or shift_sequence != _breach_sequence or state != FieldState.SHIFTING:
+		return
+	field_shift.complete_animation()
+	state = FieldState.PLAYING
+	_show_temporary_feedback("SHIFT STABLE" if result.stable else "FIELD SHIFT COMPLETE")
+	_update_hud()
+	if board.all_safe_cells_revealed():
+		_finish_field()
 
 
 func _resolve_auto_chords(changed_flag_position: Vector2i) -> BoardActionResult:
@@ -414,6 +522,9 @@ func _refresh_changed_cells(changed: Array[Vector2i]) -> void:
 func _finish_field() -> void:
 	if state == FieldState.CLEARED or state == FieldState.LOST:
 		return
+	if field_shift.state == FieldShiftController.ShiftState.ACTIVE:
+		field_shift.cancel_mode()
+	_reset_field_shift_ui()
 	state = FieldState.CLEARED
 	board_view.show_win(board)
 	var field_config := run.current_config()
@@ -481,6 +592,9 @@ func _enter_next_field() -> void:
 func _finish_loss(fatal_positions: Array[Vector2i]) -> void:
 	if state == FieldState.LOST:
 		return
+	if field_shift.state == FieldShiftController.ShiftState.ACTIVE:
+		field_shift.cancel_mode()
+	_reset_field_shift_ui()
 	state = FieldState.LOST
 	_set_logic_probe_mode(false)
 	board_view.present_run_loss(board, fatal_positions)
@@ -527,6 +641,9 @@ func _show_run_summary(won: bool) -> void:
 func _show_pause() -> void:
 	if run.state != RunController.RunState.IN_PROGRESS or (state != FieldState.READY and state != FieldState.PLAYING):
 		return
+	if field_shift.state == FieldShiftController.ShiftState.ACTIVE:
+		field_shift.cancel_mode()
+	_reset_field_shift_ui()
 	_paused = true
 	_set_logic_probe_mode(false)
 	pause_screen.show()
@@ -545,6 +662,9 @@ func _show_restart_confirmation() -> void:
 	if run.state != RunController.RunState.IN_PROGRESS or (state != FieldState.READY and state != FieldState.PLAYING):
 		return
 	field_restart_requested.emit()
+	if field_shift.state == FieldShiftController.ShiftState.ACTIVE:
+		field_shift.cancel_mode()
+	_reset_field_shift_ui()
 	_set_logic_probe_mode(false)
 	_confirmation_mode = ConfirmationMode.RESTART_FIELD
 	_confirmation_returns_to_pause = pause_screen.visible
@@ -568,6 +688,9 @@ func _show_restart_confirmation() -> void:
 func _show_leave_confirmation() -> void:
 	if run.state != RunController.RunState.IN_PROGRESS:
 		return
+	if field_shift.state == FieldShiftController.ShiftState.ACTIVE:
+		field_shift.cancel_mode()
+	_reset_field_shift_ui()
 	_confirmation_mode = ConfirmationMode.LEAVE_RUN
 	_set_logic_probe_mode(false)
 	_confirmation_returns_to_pause = pause_screen.visible
@@ -648,8 +771,11 @@ func _cancel_module_confirmation() -> void:
 
 
 func _show_modules_panel() -> void:
-	if run.state != RunController.RunState.IN_PROGRESS or state == FieldState.BREACH_RECOVERY or field_result_screen.visible:
+	if run.state != RunController.RunState.IN_PROGRESS or state == FieldState.BREACH_RECOVERY or state == FieldState.SHIFTING or field_result_screen.visible:
 		return
+	if field_shift.state == FieldShiftController.ShiftState.ACTIVE:
+		field_shift.cancel_mode()
+	_reset_field_shift_ui()
 	_paused = true
 	_set_logic_probe_mode(false)
 	modules_body.text = modules.module_state_summary(board != null and board.mines_are_placed)
@@ -699,6 +825,31 @@ func _update_module_hud() -> void:
 		modules_body.text = modules.module_state_summary(board != null and board.mines_are_placed)
 
 
+func _on_field_shift_state_changed(_next_state: int) -> void:
+	if is_node_ready():
+		_update_field_shift_hud()
+
+
+func _update_field_shift_hud() -> void:
+	if field_shift_button == null:
+		return
+	match field_shift.state:
+		FieldShiftController.ShiftState.ACTIVE:
+			field_shift_button.text = "SHIFT ACTIVE"
+			field_shift_button.modulate = Color("ffca5c")
+		FieldShiftController.ShiftState.ANIMATING:
+			field_shift_button.text = "SHIFTING"
+			field_shift_button.modulate = Color("ffca5c")
+		FieldShiftController.ShiftState.USED:
+			field_shift_button.text = "SHIFT 0"
+			field_shift_button.modulate = Color("7b8da1")
+		_:
+			field_shift_button.text = "SHIFT 1"
+			field_shift_button.modulate = Color.WHITE if field_shift.state == FieldShiftController.ShiftState.READY else Color("9aa8bc")
+	field_shift_button.disabled = _paused or state == FieldState.SHIFTING or state == FieldState.BREACH_RECOVERY or state == FieldState.CLEARED or state == FieldState.LOST
+	field_shift_button.tooltip_text = "Rotate a covered 2×2 region. Left Click: clockwise. Right Click: counter-clockwise."
+
+
 func _module_card_text(definition: ModuleDefinition) -> String:
 	var behavior := "ACTIVE" if definition.trigger_type == ModuleDefinition.TriggerType.ACTIVE_TOOL else "PASSIVE"
 	var charge := ""
@@ -714,7 +865,8 @@ func _module_card_text(definition: ModuleDefinition) -> String:
 
 func _set_logic_probe_mode(requested: bool) -> void:
 	var probe_runtime := modules.get_runtime(ModuleController.LOGIC_PROBE)
-	var available := requested and probe_runtime != null and probe_runtime.field_available and board != null and board.mines_are_placed and state == FieldState.PLAYING and not _paused
+	var shift_blocks_probe := field_shift.state == FieldShiftController.ShiftState.ACTIVE or field_shift.state == FieldShiftController.ShiftState.ANIMATING
+	var available := requested and not shift_blocks_probe and probe_runtime != null and probe_runtime.field_available and board != null and board.mines_are_placed and state == FieldState.PLAYING and not _paused
 	_logic_probe_mode = available
 	if board_view != null:
 		board_view.set_logic_probe_mode(available)
@@ -755,6 +907,7 @@ func _update_hud() -> void:
 	mines_label.text = "MINES %d" % maxi(0, board.active_mine_count() - board.flags_placed)
 	_update_integrity_label()
 	_update_module_hud()
+	_update_field_shift_hud()
 	_update_restart_controls()
 	_update_time_label()
 	if _paused:
@@ -768,6 +921,9 @@ func _update_hud() -> void:
 		FieldState.PLAYING:
 			state_label.text = "ACTIVE"
 			state_label.modulate = Color("65ddff")
+		FieldState.SHIFTING:
+			state_label.text = "SHIFTING"
+			state_label.modulate = Color("ffca5c")
 		FieldState.BREACH_RECOVERY:
 			state_label.text = "BREACH"
 			state_label.modulate = Color("ff7185")
@@ -814,7 +970,12 @@ func _show_temporary_feedback(message: String) -> void:
 func _hide_temporary_feedback(feedback_marker: int) -> void:
 	await get_tree().create_timer(0.7).timeout
 	if feedback_marker == _breach_sequence and state != FieldState.BREACH_RECOVERY:
-		breach_label.hide()
+		if field_shift.state == FieldShiftController.ShiftState.ACTIVE:
+			breach_label.text = "FIELD SHIFT ACTIVE"
+			breach_label.modulate = Color("ffca5c")
+			breach_label.show()
+		else:
+			breach_label.hide()
 
 
 func _pulse_integrity() -> void:

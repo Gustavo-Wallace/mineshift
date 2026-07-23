@@ -207,6 +207,69 @@ func reveal_orthogonal_safe_cells(origins: Array[Vector2i]) -> Array[Vector2i]:
 	return changed
 
 
+func shift_region_positions(anchor: Vector2i) -> Array[Vector2i]:
+	return [anchor, anchor + Vector2i.RIGHT, anchor + Vector2i.DOWN, anchor + Vector2i(1, 1)]
+
+
+func is_shift_region_valid(anchor: Vector2i) -> bool:
+	if anchor.x < 0 or anchor.y < 0 or anchor.x >= width - 1 or anchor.y >= height - 1:
+		return false
+	for cell_position in shift_region_positions(anchor):
+		if is_revealed(cell_position) or is_neutralized(cell_position):
+			return false
+	return true
+
+
+func rotate_hidden_region(anchor: Vector2i, clockwise: bool) -> FieldShiftResult:
+	var result := FieldShiftResult.new()
+	result.anchor = anchor
+	result.direction = FieldShiftResult.Direction.CLOCKWISE if clockwise else FieldShiftResult.Direction.COUNTER_CLOCKWISE
+	result.affected_positions = shift_region_positions(anchor)
+	if not mines_are_placed or not is_shift_region_valid(anchor):
+		return result
+
+	var previous_counts := _adjacent_counts.duplicate()
+	var old_mines: Array[int] = []
+	var old_flags: Array[int] = []
+	var old_confirmed: Array[int] = []
+	for cell_position in result.affected_positions:
+		var cell_index := _index(cell_position)
+		old_mines.append(int(_mines[cell_index]))
+		old_flags.append(int(_flagged[cell_index]))
+		old_confirmed.append(int(_confirmed_flags[cell_index]))
+		result.mines_moved += old_mines[-1]
+		result.flags_moved += old_flags[-1]
+		result.confirmed_flags_moved += old_confirmed[-1]
+
+	var source_indices: Array[int] = []
+	if clockwise:
+		source_indices.assign([2, 0, 3, 1])
+	else:
+		source_indices.assign([1, 3, 0, 2])
+	result.stable = true
+	for destination_index in result.affected_positions.size():
+		var source_index := source_indices[destination_index]
+		var destination_position := result.affected_positions[destination_index]
+		var board_index := _index(destination_position)
+		_mines[board_index] = old_mines[source_index]
+		_flagged[board_index] = old_flags[source_index]
+		_confirmed_flags[board_index] = old_confirmed[source_index]
+		if old_flags[destination_index] != old_flags[source_index]:
+			flag_changed.emit(destination_position, old_flags[source_index] == 1)
+		if old_mines[destination_index] != old_mines[source_index] or old_flags[destination_index] != old_flags[source_index] or old_confirmed[destination_index] != old_confirmed[source_index]:
+			result.stable = false
+
+	_calculate_adjacent_counts()
+	for y in height:
+		for x in width:
+			var cell_position := Vector2i(x, y)
+			if is_revealed(cell_position) and not has_mine(cell_position) and int(previous_counts[_index(cell_position)]) != adjacent_mines(cell_position):
+				result.numbers_changed.append(cell_position)
+	board_numbers_recalculated.emit(result.numbers_changed)
+	result.succeeded = true
+	return result
+
+
 func _expand_recalculated_zeros(seeds: Array[Vector2i], changed: Array[Vector2i]) -> void:
 	var queued := PackedByteArray()
 	queued.resize(width * height)
@@ -368,6 +431,7 @@ func _set_revealed(position: Vector2i, changed: Array[Vector2i]) -> void:
 
 
 func _calculate_adjacent_counts() -> void:
+	_adjacent_counts.fill(0)
 	for y in height:
 		for x in width:
 			var position := Vector2i(x, y)
