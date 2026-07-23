@@ -1,7 +1,7 @@
 class_name MineCell
 extends Control
 
-signal reveal_requested(position: Vector2i)
+signal reveal_requested(position: Vector2i, logic_probe_requested: bool)
 signal flag_toggle_requested(position: Vector2i)
 
 const DEFAULT_CELL_SIZE := 54.0
@@ -20,7 +20,8 @@ const NUMBER_COLORS: Array[Color] = [
 var board_position := Vector2i.ZERO
 var revealed := false
 var flagged := false
-var verified_flag := false
+var confirmed_flag := false
+var logic_probe_mode := false
 var contains_mine := false
 var neutralized := false
 var adjacent_count := 0
@@ -55,7 +56,7 @@ func set_cell_size(cell_size: float) -> void:
 func set_visual_state(
 	is_revealed: bool,
 	is_flagged: bool,
-	is_verified_flag: bool,
+	is_confirmed_flag: bool,
 	has_mine: bool,
 	nearby_mines: int,
 	is_neutralized: bool = false,
@@ -67,7 +68,7 @@ func set_visual_state(
 ) -> void:
 	revealed = is_revealed
 	flagged = is_flagged
-	verified_flag = is_verified_flag
+	confirmed_flag = is_confirmed_flag
 	contains_mine = has_mine
 	neutralized = is_neutralized
 	adjacent_count = nearby_mines
@@ -87,6 +88,12 @@ func pulse_recalculation() -> void:
 	tween.tween_property(self, "scale", Vector2.ONE, 0.13).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
 
 
+func set_logic_probe_mode(enabled: bool) -> void:
+	logic_probe_mode = enabled
+	mouse_default_cursor_shape = Control.CURSOR_CROSS if enabled and not revealed and not flagged and not neutralized and not locked else (Control.CURSOR_ARROW if locked else Control.CURSOR_POINTING_HAND)
+	queue_redraw()
+
+
 func _gui_input(event: InputEvent) -> void:
 	if locked:
 		return
@@ -96,7 +103,7 @@ func _gui_input(event: InputEvent) -> void:
 			_pressed = mouse_event.pressed
 			queue_redraw()
 			if not mouse_event.pressed:
-				reveal_requested.emit(board_position)
+				reveal_requested.emit(board_position, mouse_event.shift_pressed)
 			accept_event()
 		elif mouse_event.button_index == MOUSE_BUTTON_RIGHT and mouse_event.pressed:
 			flag_toggle_requested.emit(board_position)
@@ -104,7 +111,7 @@ func _gui_input(event: InputEvent) -> void:
 	elif event is InputEventKey and event.pressed and not event.echo:
 		var key_event := event as InputEventKey
 		if key_event.keycode == KEY_ENTER or key_event.keycode == KEY_SPACE:
-			reveal_requested.emit(board_position)
+			reveal_requested.emit(board_position, key_event.shift_pressed)
 			accept_event()
 
 
@@ -132,9 +139,9 @@ func _draw() -> void:
 	elif neutralized:
 		_draw_neutralized_mine(rect)
 	elif flagged:
-		_draw_flag(rect, Color("67e8a5") if resolved or verified_flag else Color("65ddff"))
-		if verified_flag:
-			_draw_verified_seal(rect)
+		_draw_flag(rect, Color("67e8a5") if resolved or confirmed_flag else Color("65ddff"))
+		if confirmed_flag:
+			_draw_confirmed_seal(rect)
 	elif contains_mine and locked:
 		_draw_mine(rect)
 
@@ -143,6 +150,11 @@ func _draw() -> void:
 
 	if has_focus() and not locked:
 		draw_rect(rect.grow(-2.0), Color("a5efff"), false, 1.5)
+	elif logic_probe_mode and _hovered and not revealed and not flagged and not neutralized and not locked:
+		draw_rect(rect.grow(-3.0), Color("f06dff"), false, 2.5)
+		var center := rect.get_center()
+		draw_line(center - Vector2(7, 0), center + Vector2(7, 0), Color("f06dff"), 1.5)
+		draw_line(center - Vector2(0, 7), center + Vector2(0, 7), Color("f06dff"), 1.5)
 	elif can_chord and _hovered and not locked:
 		draw_rect(rect.grow(-2.0), Color("67e8a5"), false, 2.0)
 
@@ -231,7 +243,7 @@ func _draw_wrong_flag(rect: Rect2) -> void:
 	draw_line(center + Vector2(-12, 12), center + Vector2(12, -12), Color("ff7185"), 2.5)
 
 
-func _draw_verified_seal(rect: Rect2) -> void:
+func _draw_confirmed_seal(rect: Rect2) -> void:
 	var center := rect.get_center()
 	var radius := minf(size.x, size.y) * 0.34
 	var diamond := PackedVector2Array([

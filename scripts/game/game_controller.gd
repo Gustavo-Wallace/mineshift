@@ -71,6 +71,7 @@ var _paused := false
 var _confirmation_mode := ConfirmationMode.NONE
 var _confirmation_returns_to_pause := false
 var _breach_sequence := 0
+var _logic_probe_mode := false
 
 
 func _ready() -> void:
@@ -133,6 +134,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if run.state != RunController.RunState.IN_PROGRESS:
 		return
+	if event is InputEventKey and not event.echo:
+		var key_event := event as InputEventKey
+		if key_event.keycode == KEY_SHIFT:
+			_set_logic_probe_mode(key_event.pressed)
+			return
 	if event.is_action_pressed("ui_cancel") and (state == FieldState.READY or state == FieldState.PLAYING):
 		_show_pause()
 		get_viewport().set_input_as_handled()
@@ -145,6 +151,7 @@ func start_new_run() -> void:
 	_breach_sequence += 1
 	_paused = false
 	_confirmation_mode = ConfirmationMode.NONE
+	_set_logic_probe_mode(false)
 	modules.on_run_started()
 	run.start_run()
 	start_screen.hide()
@@ -207,28 +214,81 @@ func _load_current_field() -> void:
 	_displayed_second = 0
 	board = BoardModel.new(field_config.width, field_config.height, field_config.mine_count)
 	board_view.build(field_config.width, field_config.height)
-	modules.on_field_started()
+	modules.on_field_started(field_config.field_number)
 	field_result_screen.hide()
 	breach_label.hide()
 	restart_button.disabled = not run.can_restart_attempt(modules.restart_is_free())
 	pause_button.disabled = false
 	abandon_button.disabled = false
 	_update_hud()
+	var probe_runtime := modules.get_runtime(ModuleController.LOGIC_PROBE)
+	if probe_runtime != null and not probe_runtime.instruction_shown:
+		probe_runtime.instruction_shown = true
+		_show_temporary_feedback("SHIFT + LEFT CLICK — LOGIC PROBE")
 
 
-func _on_reveal_requested(cell_position: Vector2i) -> void:
+func _on_reveal_requested(cell_position: Vector2i, logic_probe_requested: bool = false) -> void:
+	if logic_probe_requested and modules.has_module(ModuleController.LOGIC_PROBE):
+		_use_logic_probe(cell_position)
+		return
 	if _paused or (state != FieldState.READY and state != FieldState.PLAYING) or board.is_flagged(cell_position):
 		return
 	if board.is_revealed(cell_position):
 		_try_chord(cell_position)
 		return
-	if state == FieldState.READY:
+	var is_opening_reveal := state == FieldState.READY
+	if is_opening_reveal:
 		board.generate_mines(cell_position, modules.opening_protection_radius())
 		state = FieldState.PLAYING
 		if modules.has_module(ModuleController.EXPANDED_START):
 			_show_temporary_feedback("EXPANDED SAFE START")
 	var action: BoardActionResult = board.perform_reveal_action(cell_position)
+	if is_opening_reveal and modules.has_module(ModuleController.EXPANDED_START):
+		modules.record_expanded_opening(action.safe_revealed.size())
 	_handle_board_action(action)
+
+
+func _use_logic_probe(cell_position: Vector2i) -> void:
+	if _paused or state == FieldState.BREACH_RECOVERY or state == FieldState.CLEARED or state == FieldState.LOST:
+		return
+	var probe_runtime := modules.get_runtime(ModuleController.LOGIC_PROBE)
+	if probe_runtime == null:
+		return
+	if state == FieldState.READY or not board.mines_are_placed:
+		_show_temporary_feedback("REVEAL A CELL FIRST")
+		return
+	if not probe_runtime.field_available:
+		_show_temporary_feedback("LOGIC PROBE CONSUMED")
+		return
+	if not board.is_valid_position(cell_position) or board.is_revealed(cell_position) or board.is_flagged(cell_position) or board.is_neutralized(cell_position):
+		_show_temporary_feedback("INVALID PROBE TARGET")
+		return
+	if board.has_mine(cell_position) and board.flags_placed >= board.active_mine_count():
+		_show_temporary_feedback("FLAG LIMIT REACHED")
+		return
+	if not modules.consume_logic_probe():
+		return
+	_set_logic_probe_mode(false)
+	if board.has_mine(cell_position):
+		board.toggle_flag(cell_position)
+		board.mark_flag_confirmed(cell_position)
+		modules.record_probe_result(false)
+		board_view.refresh_cell(board, cell_position)
+		for neighbor in board.get_neighbors(cell_position):
+			if board.is_revealed(neighbor):
+				board_view.refresh_cell(board, neighbor)
+		_update_hud()
+		var auto_action := BoardActionResult.new()
+		if modules.has_module(ModuleController.AUTO_CHORD):
+			auto_action = _resolve_auto_chords(cell_position)
+		_show_temporary_feedback("MINE CONFIRMED" if not auto_action.performed else "MINE CONFIRMED · AUTO CHORD")
+		if auto_action.performed:
+			_handle_board_action(auto_action)
+	else:
+		modules.record_probe_result(true)
+		var safe_action: BoardActionResult = board.perform_reveal_action(cell_position)
+		_show_temporary_feedback("SAFE SIGNAL")
+		_handle_board_action(safe_action)
 
 
 func _try_chord(cell_position: Vector2i) -> void:
@@ -281,6 +341,9 @@ func _recover_from_breach(action: BoardActionResult) -> void:
 				action.expansion_revealed.append(revealed_position)
 		board_view.pulse_neutralized(action.neutralized_mines)
 		breach_label.text = "BREACH PULSE"
+		if not pulse_revealed.is_empty():
+			modules.record_activation(ModuleController.BREACH_PULSE)
+			modules.record_activation(ModuleController.BREACH_PULSE, pulse_revealed.size(), "cells_revealed")
 	_refresh_changed_cells(action.all_changed_positions())
 	board_view.refresh_recalculated(board, action.recalculated_positions)
 	board_view.show_breach(board, action.neutralized_mines)
@@ -308,27 +371,13 @@ func _on_flag_requested(cell_position: Vector2i) -> void:
 	if _paused or (state != FieldState.READY and state != FieldState.PLAYING):
 		return
 	var was_flagged := board.is_flagged(cell_position)
-	var verifier_runtime := modules.get_runtime(ModuleController.FLAG_VERIFIER)
-	if state == FieldState.READY and not was_flagged and verifier_runtime != null and verifier_runtime.field_available:
-		_show_temporary_feedback("REVEAL FIELD BEFORE VERIFYING")
-		return
 	if board.toggle_flag(cell_position):
 		var is_now_flagged := board.is_flagged(cell_position)
-		if not was_flagged and is_now_flagged and modules.consume_flag_verifier():
-			if board.has_mine(cell_position):
-				board.mark_flag_verified(cell_position)
-				_show_temporary_feedback("FLAG VERIFIED")
-			else:
-				board.remove_flag(cell_position)
-				board_view.refresh_cell(board, cell_position)
-				_update_hud()
-				_show_temporary_feedback("INVALID FLAG")
-				return
 		board_view.refresh_cell(board, cell_position)
 		for neighbor in board.get_neighbors(cell_position):
 			if board.is_revealed(neighbor):
 				board_view.refresh_cell(board, neighbor)
-		if modules.has_module(ModuleController.AUTO_CHORD):
+		if not was_flagged and is_now_flagged and modules.has_module(ModuleController.AUTO_CHORD):
 			var auto_action := _resolve_auto_chords(cell_position)
 			if auto_action.performed:
 				_show_temporary_feedback("AUTO CHORD")
@@ -347,6 +396,9 @@ func _resolve_auto_chords(changed_flag_position: Vector2i) -> BoardActionResult:
 	for target in targets:
 		if board.can_chord(target):
 			combined.merge_from(board.perform_chord_action(target))
+	if combined.performed:
+		modules.record_activation(ModuleController.AUTO_CHORD)
+		modules.record_activation(ModuleController.AUTO_CHORD, combined.safe_revealed.size(), "cells_revealed")
 	return combined
 
 
@@ -406,7 +458,7 @@ func _show_field_transition(result: FieldResult) -> void:
 		var option_button := module_option_buttons[option_index]
 		if option_index < offers.size():
 			var definition := offers[option_index]
-			option_button.text = "%s  %s\n%s\n%s" % [definition.symbol, definition.display_name, definition.tag, definition.short_description]
+			option_button.text = _module_card_text(definition)
 			option_button.tooltip_text = definition.full_description
 			option_button.disabled = false
 			option_button.show()
@@ -430,6 +482,7 @@ func _finish_loss(fatal_positions: Array[Vector2i]) -> void:
 	if state == FieldState.LOST:
 		return
 	state = FieldState.LOST
+	_set_logic_probe_mode(false)
 	board_view.present_run_loss(board, fatal_positions)
 	run.breach_run(elapsed_time)
 	restart_button.disabled = true
@@ -475,6 +528,7 @@ func _show_pause() -> void:
 	if run.state != RunController.RunState.IN_PROGRESS or (state != FieldState.READY and state != FieldState.PLAYING):
 		return
 	_paused = true
+	_set_logic_probe_mode(false)
 	pause_screen.show()
 	_update_restart_controls()
 	_update_hud()
@@ -491,6 +545,7 @@ func _show_restart_confirmation() -> void:
 	if run.state != RunController.RunState.IN_PROGRESS or (state != FieldState.READY and state != FieldState.PLAYING):
 		return
 	field_restart_requested.emit()
+	_set_logic_probe_mode(false)
 	_confirmation_mode = ConfirmationMode.RESTART_FIELD
 	_confirmation_returns_to_pause = pause_screen.visible
 	_paused = true
@@ -514,6 +569,7 @@ func _show_leave_confirmation() -> void:
 	if run.state != RunController.RunState.IN_PROGRESS:
 		return
 	_confirmation_mode = ConfirmationMode.LEAVE_RUN
+	_set_logic_probe_mode(false)
 	_confirmation_returns_to_pause = pause_screen.visible
 	_paused = true
 	pause_screen.hide()
@@ -595,7 +651,8 @@ func _show_modules_panel() -> void:
 	if run.state != RunController.RunState.IN_PROGRESS or state == FieldState.BREACH_RECOVERY or field_result_screen.visible:
 		return
 	_paused = true
-	modules_body.text = modules.module_state_summary()
+	_set_logic_probe_mode(false)
+	modules_body.text = modules.module_state_summary(board != null and board.mines_are_placed)
 	modules_screen.show()
 	close_modules_button.grab_focus()
 	_update_hud()
@@ -617,21 +674,56 @@ func _update_module_hud() -> void:
 		ModuleController.BREACH_PULSE: "PULSE",
 		ModuleController.EXPANDED_START: "START",
 		ModuleController.RESTART_CACHE: "CACHE",
-		ModuleController.FLAG_VERIFIER: "VERIFY",
+		ModuleController.LOGIC_PROBE: "PROBE",
 	}
 	for slot_index in module_slots.size():
 		var slot := module_slots[slot_index]
 		if slot_index < modules.installed.size():
 			var runtime := modules.installed[slot_index]
-			slot.text = "%s %s" % [runtime.definition.symbol, short_names.get(runtime.definition.id, runtime.definition.display_name)]
-			slot.tooltip_text = "%s\n%s\nSTATE: %s" % [runtime.definition.display_name, runtime.definition.full_description, runtime.state_text()]
-			slot.modulate = Color.WHITE if runtime.state_text() == "ACTIVE" or runtime.state_text() == "AVAILABLE" else Color("7b8da1")
+			var board_ready := board != null and board.mines_are_placed
+			var runtime_state := runtime.state_text(board_ready)
+			var charge_segment := ""
+			if runtime.definition.id == ModuleController.LOGIC_PROBE:
+				charge_segment = " ●" if runtime.field_available and board_ready else (" ·" if runtime.field_available else " ○")
+			slot.text = "%s %s%s" % [runtime.definition.symbol, short_names.get(runtime.definition.id, runtime.definition.display_name), charge_segment]
+			if runtime.definition.id == ModuleController.LOGIC_PROBE:
+				slot.tooltip_text = "Logic Probe: %s\nShift + Left Click\n%s" % ["1 charge" if runtime.field_available and board_ready else ("reveal normally first" if runtime.field_available else "used"), runtime.definition.full_description]
+			else:
+				slot.tooltip_text = "%s\n%s\nSTATE: %s" % [runtime.definition.display_name, runtime.definition.full_description, runtime_state]
+			slot.modulate = Color.WHITE if runtime_state == "ACTIVE" or runtime_state == "AVAILABLE" or runtime_state == "READY" else Color("7b8da1")
 			slot.show()
 		else:
 			slot.hide()
 	modules_button.tooltip_text = "%d active module%s" % [modules.installed_count(), "" if modules.installed_count() == 1 else "s"]
 	if modules_screen.visible:
-		modules_body.text = modules.module_state_summary()
+		modules_body.text = modules.module_state_summary(board != null and board.mines_are_placed)
+
+
+func _module_card_text(definition: ModuleDefinition) -> String:
+	var behavior := "ACTIVE" if definition.trigger_type == ModuleDefinition.TriggerType.ACTIVE_TOOL else "PASSIVE"
+	var charge := ""
+	match definition.id:
+		ModuleController.LOGIC_PROBE:
+			charge = "\n1 USE PER FIELD"
+		ModuleController.BUFFER_LAYER:
+			charge = "\n1 BLOCK PER FIELD"
+		ModuleController.RESTART_CACHE:
+			charge = "\n1 FREE RESTART PER RUN"
+	return "%s  %s\n%s · %s%s\n%s" % [definition.symbol, definition.display_name, definition.tag, behavior, charge, definition.short_description]
+
+
+func _set_logic_probe_mode(requested: bool) -> void:
+	var probe_runtime := modules.get_runtime(ModuleController.LOGIC_PROBE)
+	var available := requested and probe_runtime != null and probe_runtime.field_available and board != null and board.mines_are_placed and state == FieldState.PLAYING and not _paused
+	_logic_probe_mode = available
+	if board_view != null:
+		board_view.set_logic_probe_mode(available)
+	if available:
+		breach_label.text = "LOGIC PROBE ACTIVE"
+		breach_label.modulate = Color("f06dff")
+		breach_label.show()
+	elif breach_label != null and breach_label.text == "LOGIC PROBE ACTIVE":
+		breach_label.hide()
 
 
 func _update_module_choice_layout() -> void:

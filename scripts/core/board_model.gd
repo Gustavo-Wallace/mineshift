@@ -24,7 +24,7 @@ var _mines: PackedByteArray
 var _neutralized: PackedByteArray
 var _revealed: PackedByteArray
 var _flagged: PackedByteArray
-var _verified_flags: PackedByteArray
+var _confirmed_flags: PackedByteArray
 var _adjacent_counts: PackedByteArray
 
 
@@ -50,8 +50,8 @@ func reset(board_width: int, board_height: int, total_mines: int) -> void:
 	_revealed.resize(cell_count)
 	_flagged = PackedByteArray()
 	_flagged.resize(cell_count)
-	_verified_flags = PackedByteArray()
-	_verified_flags.resize(cell_count)
+	_confirmed_flags = PackedByteArray()
+	_confirmed_flags.resize(cell_count)
 	_adjacent_counts = PackedByteArray()
 	_adjacent_counts.resize(cell_count)
 
@@ -164,7 +164,7 @@ func neutralize_detonations(action: BoardActionResult) -> void:
 		var mine_index := _index(mine_position)
 		if _flagged[mine_index] == 1:
 			_flagged[mine_index] = 0
-			_verified_flags[mine_index] = 0
+			_confirmed_flags[mine_index] = 0
 			flags_placed -= 1
 			flag_changed.emit(mine_position, false)
 		_mines[mine_index] = 0
@@ -235,7 +235,7 @@ func toggle_flag(position: Vector2i) -> bool:
 		return false
 	var index := _index(position)
 	if _flagged[index] == 1:
-		if _verified_flags[index] == 1:
+		if _confirmed_flags[index] == 1:
 			return false
 		_flagged[index] = 0
 		flags_placed -= 1
@@ -248,10 +248,10 @@ func toggle_flag(position: Vector2i) -> bool:
 	return true
 
 
-func mark_flag_verified(position: Vector2i) -> bool:
+func mark_flag_confirmed(position: Vector2i) -> bool:
 	if not is_valid_position(position) or not is_flagged(position) or not has_mine(position):
 		return false
-	_verified_flags[_index(position)] = 1
+	_confirmed_flags[_index(position)] = 1
 	return true
 
 
@@ -260,7 +260,7 @@ func remove_flag(position: Vector2i) -> bool:
 		return false
 	var cell_index := _index(position)
 	_flagged[cell_index] = 0
-	_verified_flags[cell_index] = 0
+	_confirmed_flags[cell_index] = 0
 	flags_placed -= 1
 	flag_changed.emit(position, false)
 	return true
@@ -297,8 +297,8 @@ func is_flagged(position: Vector2i) -> bool:
 	return is_valid_position(position) and _flagged[_index(position)] == 1
 
 
-func is_flag_verified(position: Vector2i) -> bool:
-	return is_valid_position(position) and _verified_flags[_index(position)] == 1
+func is_flag_confirmed(position: Vector2i) -> bool:
+	return is_valid_position(position) and _confirmed_flags[_index(position)] == 1
 
 
 func adjacent_mines(position: Vector2i) -> int:
@@ -323,7 +323,7 @@ func create_snapshot() -> Dictionary:
 		"neutralized": _neutralized.duplicate(),
 		"revealed": _revealed.duplicate(),
 		"flagged": _flagged.duplicate(),
-		"verified_flags": _verified_flags.duplicate(),
+		"confirmed_flags": _confirmed_flags.duplicate(),
 		"adjacent": _adjacent_counts.duplicate(),
 	}
 

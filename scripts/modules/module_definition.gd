@@ -1,7 +1,9 @@
 class_name ModuleDefinition
 extends RefCounted
 
-enum TriggerType { PASSIVE, FIELD_TRIGGER, ACTION_TRIGGER }
+# Module design rule: every module must change information, actions, breach consequences,
+# board generation, real Minesweeper automation, or the handling of ambiguity.
+enum TriggerType { PASSIVE, FIELD_TRIGGER, ACTION_TRIGGER, ACTIVE_TOOL }
 
 var id: StringName
 var display_name: String
@@ -48,9 +50,9 @@ static func create_default_pool() -> Array[ModuleDefinition]:
 		),
 		ModuleDefinition.new(
 			&"auto_chord", "AUTO CHORD", "⌁", "AUTOMATION",
-			"Placing a flag automatically chords adjacent solved numbers. Incorrect flags remain dangerous.",
-			"After a flag changes, every adjacent revealed number with matching flags is chorded once in deterministic order.",
-			"After a flag changes", 30, TriggerType.ACTION_TRIGGER
+			"Placing a flag automatically chords adjacent numbers when their flag requirement is met.",
+			"After a flag is placed, adjacent revealed numbers with matching flags are chorded once in deterministic order. Incorrect flags can trigger breaches.",
+			"After a flag is placed", 30, TriggerType.ACTION_TRIGGER
 		),
 		ModuleDefinition.new(
 			&"breach_pulse", "BREACH PULSE", "+", "BREACH",
@@ -60,20 +62,20 @@ static func create_default_pool() -> Array[ModuleDefinition]:
 		),
 		ModuleDefinition.new(
 			&"expanded_start", "EXPANDED START", "▦", "OPENING",
-			"The first reveal protects a wider area from mine generation.",
+			"The first reveal protects a wider region from mine generation.",
 			"Protects a Chebyshev radius of two around the first reveal. Dense boards safely fall back to a smaller radius.",
 			"Before the first reveal", 5, TriggerType.PASSIVE
 		),
 		ModuleDefinition.new(
-			&"restart_cache", "RESTART CACHE", "↻", "RESTART",
+			&"restart_cache", "RESTART CACHE", "↻", "UTILITY",
 			"The first field restart of the run costs no Integrity.",
 			"Waives the first confirmed restart cost of the run. Cancelling a restart does not consume the cache.",
 			"Before a confirmed restart", 5, TriggerType.PASSIVE
 		),
 		ModuleDefinition.new(
-			&"flag_verifier", "FLAG VERIFIER", "◆", "INFORMATION",
-			"The first flag placed each field is verified.",
-			"The first flag attempt each field locks a correct mine flag or removes an invalid safe flag without revealing the cell.",
-			"After the first flag placement", 10, TriggerType.FIELD_TRIGGER
+			&"logic_probe", "LOGIC PROBE", "◆", "INFORMATION",
+			"Probe one covered cell to safely resolve its contents.",
+			"Once per field, use Shift + Left Click on a covered cell. Safe cells are revealed. Active mines are automatically confirmed with a locked flag without causing a breach.",
+			"Shift + Left Click on a covered cell", 10, TriggerType.ACTIVE_TOOL
 		),
 	]

@@ -6,6 +6,7 @@ var installed_field: int
 var field_available := false
 var persistent_available := true
 var activation_count := 0
+var instruction_shown := false
 
 
 func _init(module_definition: ModuleDefinition, acquired_after_field: int) -> void:
@@ -14,7 +15,7 @@ func _init(module_definition: ModuleDefinition, acquired_after_field: int) -> vo
 
 
 func reset_for_field() -> void:
-	if definition.id == &"buffer_layer" or definition.id == &"flag_verifier":
+	if definition.id == &"buffer_layer" or definition.id == &"logic_probe":
 		field_available = true
 
 
@@ -34,10 +35,14 @@ func consume_persistent_charge() -> bool:
 	return true
 
 
-func state_text() -> String:
+func state_text(board_ready: bool = true) -> String:
 	match definition.id:
-		&"buffer_layer", &"flag_verifier":
+		&"buffer_layer":
 			return "AVAILABLE" if field_available else "USED THIS FIELD"
+		&"logic_probe":
+			if not board_ready and field_available:
+				return "UNAVAILABLE — REVEAL NORMALLY FIRST"
+			return "READY" if field_available else "CONSUMED"
 		&"restart_cache":
 			return "AVAILABLE" if persistent_available else "CONSUMED"
 		_:

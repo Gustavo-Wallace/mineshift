@@ -12,10 +12,10 @@ func _run() -> void:
 	_test_buffer_runtime()
 	_test_expanded_start()
 	_test_breach_pulse_model()
-	_test_verified_flags_model()
+	_test_confirmed_flags_model()
 	await _test_selection_interface()
 	await _test_buffer_and_restart_cache()
-	await _test_flag_verifier_and_auto_chord()
+	await _test_logic_probe_and_auto_chord()
 	if _failures == 0:
 		print("PASS: Mineshift module selection and six gameplay modules completed successfully.")
 	quit(_failures)
@@ -26,6 +26,8 @@ func _test_selection_controller() -> void:
 	controller.on_run_started()
 	controller._rng.seed = 8028
 	var first_offers := controller.generate_offers()
+	var pool_ids := _offer_ids(controller.definition_pool)
+	_expect(pool_ids.size() == 6 and pool_ids.has(ModuleController.LOGIC_PROBE), "The active six-module pool must include Logic Probe.")
 	_expect(first_offers.size() == 3 and _unique_offer_count(first_offers) == 3, "A transition must offer three different modules.")
 	_expect(controller.generate_offers() == first_offers, "Offers must remain stable while the transition is open.")
 	controller.select_offer(first_offers[0].id)
@@ -52,31 +54,38 @@ func _test_selection_controller() -> void:
 	small_pool.on_run_started()
 	small_pool.definition_pool = [ModuleDefinition.create_default_pool()[0], ModuleDefinition.create_default_pool()[1]]
 	_expect(small_pool.generate_offers().size() == 2, "A small unexpected pool must show only remaining unique modules without error.")
+	var probe_pool := ModuleController.new()
+	probe_pool.on_run_started()
+	probe_pool.definition_pool = [_definition(ModuleController.LOGIC_PROBE)]
+	_expect(probe_pool.generate_offers()[0].id == ModuleController.LOGIC_PROBE, "Logic Probe must be selectable as an active module.")
 
 
 func _test_buffer_runtime() -> void:
 	var controller := ModuleController.new()
 	controller.on_run_started()
 	_force_install(controller, ModuleController.BUFFER_LAYER, 1)
-	controller.on_field_started()
+	controller.on_field_started(1)
 	_expect(controller.absorb_breach_damage(2) == 1, "Buffer Layer must absorb only one point from a multi-breach.")
 	_expect(controller.absorb_breach_damage(1) == 0, "Buffer Layer must be consumed after the first breach.")
-	controller.on_field_started()
+	controller.on_field_started(2)
 	_expect(controller.absorb_breach_damage(1) == 1, "Buffer Layer must recharge for a new or restarted field.")
+	var buffer_telemetry: Dictionary = controller.telemetry_snapshot()[ModuleController.BUFFER_LAYER]
+	_expect(buffer_telemetry["damage_blocked"] == 2 and (buffer_telemetry["useful_fields"] as Array).size() == 2, "Buffer telemetry must record blocked damage and useful fields without exposing them in the HUD.")
 
 
 func _test_expanded_start() -> void:
-	for first_position in [Vector2i(4, 4), Vector2i(0, 0)]:
-		var board := BoardModel.new(9, 9, 10)
-		board.generate_mines(first_position, 2)
-		var mines := 0
-		for y in board.height:
-			for x in board.width:
-				var cell_position := Vector2i(x, y)
-				if board.has_mine(cell_position):
-					mines += 1
-				_expect(not board.has_mine(cell_position) if maxi(absi(cell_position.x - first_position.x), absi(cell_position.y - first_position.y)) <= 2 else true, "Expanded Start must protect the bounded 5×5 opening region.")
-		_expect(mines == 10, "Expanded Start must preserve the exact configured mine count.")
+	for field_config in FieldConfig.create_default_run():
+		for first_position in [Vector2i(floori(float(field_config.width) / 2.0), floori(float(field_config.height) / 2.0)), Vector2i(0, 0), Vector2i(field_config.width - 1, field_config.height - 1)]:
+			var board := BoardModel.new(field_config.width, field_config.height, field_config.mine_count)
+			board.generate_mines(first_position, 2)
+			var mines := 0
+			for y in board.height:
+				for x in board.width:
+					var cell_position := Vector2i(x, y)
+					if board.has_mine(cell_position):
+						mines += 1
+					_expect(not board.has_mine(cell_position) if maxi(absi(cell_position.x - first_position.x), absi(cell_position.y - first_position.y)) <= 2 else true, "Expanded Start must protect the bounded 5×5 opening region.")
+			_expect(mines == field_config.mine_count, "Expanded Start must preserve the exact mine count in every field configuration.")
 	var dense_board := BoardModel.new(5, 5, 20)
 	dense_board.generate_mines(Vector2i(2, 2), 2)
 	_expect(not dense_board.has_mine(Vector2i(2, 2)) and _find_all_mines(dense_board).size() == 20, "Dense boards must fall back without loops or mine loss.")
@@ -97,17 +106,17 @@ func _test_breach_pulse_model() -> void:
 		_expect(board.has_mine(remaining_mine), "Breach Pulse must preserve every active mine.")
 
 
-func _test_verified_flags_model() -> void:
+func _test_confirmed_flags_model() -> void:
 	var board := BoardModel.new(9, 9, 10)
 	board.generate_mines(Vector2i(4, 4))
 	var mine_position := _find_all_mines(board)[0]
 	board.toggle_flag(mine_position)
-	_expect(board.mark_flag_verified(mine_position) and board.is_flag_verified(mine_position), "A correct verifier result must mark the flag explicitly.")
-	_expect(not board.toggle_flag(mine_position) and board.is_flagged(mine_position), "A verified flag must be locked.")
+	_expect(board.mark_flag_confirmed(mine_position) and board.is_flag_confirmed(mine_position), "A probed mine must receive explicit confirmed-flag state.")
+	_expect(not board.toggle_flag(mine_position) and board.is_flagged(mine_position), "A confirmed flag must be locked.")
 	var action := BoardActionResult.new()
 	action.detonated_mines.append(mine_position)
 	board.neutralize_detonations(action)
-	_expect(board.is_neutralized(mine_position) and not board.is_flagged(mine_position) and not board.is_flag_verified(mine_position), "Neutralizing a verified mine must remove its flag and seal.")
+	_expect(board.is_neutralized(mine_position) and not board.is_flagged(mine_position) and not board.is_flag_confirmed(mine_position), "Neutralizing a confirmed mine must remove its flag and seal.")
 
 
 func _test_selection_interface() -> void:
@@ -118,6 +127,8 @@ func _test_selection_interface() -> void:
 	await process_frame
 	_expect(game.field_result_screen.visible and game.module_choice_grid.visible, "Fields 1-4 must embed module selection in the compact transition.")
 	_expect(game.modules.current_offers.size() == 3 and _unique_offer_count(game.modules.current_offers) == 3, "The transition must render three distinct choices.")
+	var logic_card := game._module_card_text(_definition(ModuleController.LOGIC_PROBE))
+	_expect(logic_card.contains("INFORMATION · ACTIVE") and logic_card.contains("1 USE PER FIELD"), "Logic Probe cards must clearly identify active behavior and charge.")
 	_expect(game.next_field_button.disabled, "Entering the next field must remain blocked before installation.")
 	_expect(_inside_viewport(game.module_option_buttons[0]) and _inside_viewport(game.module_option_buttons[2]) and _inside_viewport(game.next_field_button), "All module choices and progression controls must fit in 1280×720.")
 	var offer_ids := _offer_ids(game.modules.current_offers)
@@ -174,36 +185,61 @@ func _test_buffer_and_restart_cache() -> void:
 	game.confirm_action_button.pressed.emit()
 	game.confirm_action_button.pressed.emit()
 	_expect(game.run.current_integrity == 1 and not game.modules.restart_is_free(), "The confirmed free restart must consume the cache once without damage.")
+	_expect(game.modules.telemetry_snapshot()[ModuleController.RESTART_CACHE]["restarts_saved"] == 1, "Restart Cache telemetry must record the saved restart internally.")
 	_expect(not game.run.can_restart_attempt(), "Paid restarts must become blocked again at one integrity.")
 	game.queue_free()
 	await process_frame
 
 
-func _test_flag_verifier_and_auto_chord() -> void:
+func _test_logic_probe_and_auto_chord() -> void:
 	var game := await _new_game()
 	game.start_new_run()
-	_force_install(game.modules, ModuleController.FLAG_VERIFIER, 0)
-	game.modules.on_field_started()
+	_force_install(game.modules, ModuleController.LOGIC_PROBE, 0)
+	game.modules.on_field_started(1)
+	var probe_runtime := game.modules.get_runtime(ModuleController.LOGIC_PROBE)
+	game._on_reveal_requested(Vector2i(0, 0), true)
+	_expect(probe_runtime.field_available and game.state == GameController.FieldState.READY and game.breach_label.text == "REVEAL A CELL FIRST", "Logic Probe must be unavailable before the normal opening without consuming its charge.")
+	game._on_reveal_requested(Vector2i(4, 4))
+	game._on_reveal_requested(Vector2i(4, 4), true)
+	_expect(probe_runtime.field_available, "Probing an already revealed cell must not consume the charge.")
+	var shift_event := InputEventKey.new()
+	shift_event.keycode = KEY_SHIFT
+	shift_event.pressed = true
+	game._unhandled_input(shift_event)
+	var hover_cell := game.board_view.get_child(0) as MineCell
+	_expect(game._logic_probe_mode and hover_cell.logic_probe_mode and game.breach_label.text == "LOGIC PROBE ACTIVE", "Holding Shift must activate the probe mode and cell highlight state.")
+	shift_event.pressed = false
+	game._unhandled_input(shift_event)
+	var safe_position := _find_closed_safe(game.board)
+	var safe_revealed_before := game.board.revealed_safe_count
+	game._on_reveal_requested(safe_position, true)
+	_expect(not probe_runtime.field_available and game.board.is_revealed(safe_position) and game.board.revealed_safe_count > safe_revealed_before, "A safe Logic Probe must consume one charge and reveal through normal propagation.")
+	_expect(game.run.current_integrity == 3 and game.breach_label.text == "SAFE SIGNAL", "A safe probe must never affect Integrity.")
+	var revealed_after_probe := game.board.revealed_safe_count
+	game._on_reveal_requested(_find_closed_safe(game.board), true)
+	_expect(game.board.revealed_safe_count == revealed_after_probe, "A consumed Logic Probe must not process a second target.")
+	game.restart_current_field()
+	probe_runtime = game.modules.get_runtime(ModuleController.LOGIC_PROBE)
+	_expect(probe_runtime.field_available, "Restarting a field must restore the Logic Probe charge.")
 	game._on_reveal_requested(Vector2i(4, 4))
 	var mine_position := _find_all_mines(game.board)[0]
+	game._on_reveal_requested(mine_position, true)
+	_expect(game.board.is_flag_confirmed(mine_position) and game.run.current_integrity == 2, "Logic Probe must confirm an active mine without additional Integrity loss after the paid restart.")
 	game._on_flag_requested(mine_position)
-	_expect(game.board.is_flag_verified(mine_position), "Flag Verifier must seal the first correct mine flag.")
-	game._on_flag_requested(mine_position)
-	_expect(game.board.is_flagged(mine_position), "The verified flag must remain locked after removal input.")
-
-	game.modules.on_field_started()
-	var safe_position := _find_closed_safe(game.board)
-	game._on_flag_requested(safe_position)
-	_expect(not game.board.is_flagged(safe_position) and not game.board.is_revealed(safe_position), "An invalid first flag must be removed without revealing information.")
-	var second_safe := _find_closed_safe(game.board)
-	game._on_flag_requested(second_safe)
-	_expect(game.board.is_flagged(second_safe) and not game.board.is_flag_verified(second_safe), "Only the first flag attempt of a field may be verified.")
+	_expect(game.board.is_flagged(mine_position), "A confirmed probe flag must remain locked against manual removal.")
+	var probe_telemetry: Dictionary = game.modules.telemetry_snapshot()[ModuleController.LOGIC_PROBE]
+	_expect(probe_telemetry["safe_probes"] == 1 and probe_telemetry["mine_probes"] == 1, "Internal telemetry must distinguish safe and mine probe results.")
+	game.start_new_run()
+	var reset_probe_telemetry: Dictionary = game.modules.telemetry_snapshot()[ModuleController.LOGIC_PROBE]
+	_expect(not game.modules.has_module(ModuleController.LOGIC_PROBE) and reset_probe_telemetry["safe_probes"] == 0 and reset_probe_telemetry["mine_probes"] == 0, "A new run must remove Logic Probe and clear its telemetry.")
 	game.queue_free()
 	await process_frame
 
 	var auto_game := await _new_game()
 	auto_game.start_new_run()
 	_force_install(auto_game.modules, ModuleController.AUTO_CHORD, 0)
+	_force_install(auto_game.modules, ModuleController.LOGIC_PROBE, 0)
+	auto_game.modules.on_field_started(1)
 	var setup := _find_correct_auto_chord_setup()
 	_expect(not setup.is_empty(), "A correct Auto Chord setup must be discoverable.")
 	if not setup.is_empty():
@@ -211,9 +247,24 @@ func _test_flag_verifier_and_auto_chord() -> void:
 		auto_game.board_view.build(auto_game.board.width, auto_game.board.height)
 		auto_game.state = GameController.FieldState.PLAYING
 		var final_flag: Vector2i = setup["final_flag"]
-		auto_game._on_flag_requested(final_flag)
-		_expect(setup["safe_target"] == Vector2i(-1, -1) or auto_game.board.is_revealed(setup["safe_target"]), "Completing a number with a flag must auto-chord its safe neighbors.")
+		auto_game._on_reveal_requested(final_flag, true)
+		_expect(auto_game.board.is_flag_confirmed(final_flag) and (setup["safe_target"] == Vector2i(-1, -1) or auto_game.board.is_revealed(setup["safe_target"])), "A confirmed probe flag must participate in and activate Auto Chord.")
+		var auto_telemetry: Dictionary = auto_game.modules.telemetry_snapshot()[ModuleController.AUTO_CHORD]
+		_expect(auto_telemetry["activations"] >= 1 and auto_telemetry["cells_revealed"] >= 1, "Auto Chord telemetry must record activations and revealed cells internally.")
 	auto_game.queue_free()
+	await process_frame
+
+	var removal_game := await _new_game()
+	removal_game.start_new_run()
+	_force_install(removal_game.modules, ModuleController.AUTO_CHORD, 0)
+	removal_game.modules.on_field_started(1)
+	removal_game._on_reveal_requested(Vector2i(4, 4))
+	var removable_safe := _find_closed_safe(removal_game.board)
+	removal_game._on_flag_requested(removable_safe)
+	var activations_after_placement: int = removal_game.modules.telemetry_snapshot()[ModuleController.AUTO_CHORD]["activations"]
+	removal_game._on_flag_requested(removable_safe)
+	_expect(removal_game.modules.telemetry_snapshot()[ModuleController.AUTO_CHORD]["activations"] == activations_after_placement, "Removing a flag must never trigger Auto Chord.")
+	removal_game.queue_free()
 	await process_frame
 
 	var risk_game := await _new_game()

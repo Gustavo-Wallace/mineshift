@@ -6,12 +6,13 @@ The current foundation is a five-field run with progressively larger boards, cla
 
 Each run has three persistent Integrity points. Detonated mines consume Integrity, become neutralized, and dynamically update nearby numbers; newly formed zeroes expand normally. Restarting a field costs one Integrity and is unavailable when only one point remains.
 
-After each of the first four fields, choose one of three free gameplay modules. Modules persist for the run and directly change minesweeper rules. The current set is **Buffer Layer**, **Auto Chord**, **Breach Pulse**, **Expanded Start**, **Restart Cache**, and **Flag Verifier**.
+After each of the first four fields, choose one of three free gameplay modules. Passive and active modules persist for the run and directly change minesweeper rules. The current set is **Buffer Layer**, **Auto Chord**, **Breach Pulse**, **Expanded Start**, **Restart Cache**, and **Logic Probe**.
 
 ## Controls
 
 - Left click: reveal a cell or chord a revealed number
 - Right click: place or remove a flag
+- `Shift` + left click: use Logic Probe when installed
 - `R`: request a field restart (costs one Integrity)
 - `Esc`: pause
 

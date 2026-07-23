@@ -1,7 +1,7 @@
 class_name BoardView
 extends GridContainer
 
-signal cell_reveal_requested(cell_position: Vector2i)
+signal cell_reveal_requested(cell_position: Vector2i, logic_probe_requested: bool)
 signal cell_flag_requested(cell_position: Vector2i)
 
 const CELL_SCENE: PackedScene = preload("res://scenes/ui/mine_cell.tscn")
@@ -41,7 +41,7 @@ func refresh_cell(model: BoardModel, cell_position: Vector2i, locked: bool = fal
 	cell.set_visual_state(
 		model.is_revealed(cell_position),
 		model.is_flagged(cell_position),
-		model.is_flag_verified(cell_position),
+		model.is_flag_confirmed(cell_position),
 		model.has_mine(cell_position),
 		model.adjacent_mines(cell_position),
 		model.is_neutralized(cell_position),
@@ -67,7 +67,7 @@ func show_breach(model: BoardModel, detonated_positions: Array[Vector2i]) -> voi
 			cell.set_visual_state(
 				model.is_revealed(cell_position),
 				model.is_flagged(cell_position),
-				model.is_flag_verified(cell_position),
+				model.is_flag_confirmed(cell_position),
 				model.has_mine(cell_position),
 				model.adjacent_mines(cell_position),
 				model.is_neutralized(cell_position),
@@ -85,7 +85,7 @@ func present_run_loss(model: BoardModel, fatal_positions: Array[Vector2i]) -> vo
 			cell.set_visual_state(
 				model.is_revealed(cell_position),
 				model.is_flagged(cell_position),
-				model.is_flag_verified(cell_position),
+				model.is_flag_confirmed(cell_position),
 				model.has_mine(cell_position),
 				model.adjacent_mines(cell_position),
 				model.is_neutralized(cell_position),
@@ -103,7 +103,7 @@ func show_win(model: BoardModel) -> void:
 			cell.set_visual_state(
 				model.is_revealed(cell_position),
 				model.is_flagged(cell_position) or model.has_mine(cell_position),
-				model.is_flag_verified(cell_position),
+				model.is_flag_confirmed(cell_position),
 				model.has_mine(cell_position),
 				model.adjacent_mines(cell_position),
 				model.is_neutralized(cell_position),
@@ -136,6 +136,11 @@ func pulse_neutralized(positions: Array[Vector2i]) -> void:
 			cell.pulse_recalculation()
 
 
+func set_logic_probe_mode(enabled: bool) -> void:
+	for cell in _cells:
+		cell.set_logic_probe_mode(enabled)
+
+
 func _get_cell(cell_position: Vector2i) -> MineCell:
 	var index := cell_position.y * _board_width + cell_position.x
 	if index < 0 or index >= _cells.size():
@@ -143,8 +148,8 @@ func _get_cell(cell_position: Vector2i) -> MineCell:
 	return _cells[index]
 
 
-func _on_cell_reveal_requested(cell_position: Vector2i) -> void:
-	cell_reveal_requested.emit(cell_position)
+func _on_cell_reveal_requested(cell_position: Vector2i, logic_probe_requested: bool) -> void:
+	cell_reveal_requested.emit(cell_position, logic_probe_requested)
 
 
 func _on_cell_flag_requested(cell_position: Vector2i) -> void:
